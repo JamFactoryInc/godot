@@ -31,6 +31,9 @@
 #include "gdscript.h"
 #include "gdscript_function.h"
 #include "gdscript_lambda_callable.h"
+#include "gdscript_opcodes.h"
+#include <cstdio>
+
 
 #include "core/os/os.h"
 
@@ -689,34 +692,32 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 
 		OPCODE_SWITCH(_code_ptr[ip]) {
 			OPCODE(OPCODE_OPERATOR) {
-				constexpr int _pointer_size = sizeof(Variant::ValidatedOperatorEvaluator) / sizeof(*_code_ptr);
-				CHECK_SPACE(7 + _pointer_size);
+				auto opcode = GDScriptOpcodes::BaseOpcode<OPCODE_OPERATOR>::from_instr_ptr(_code_ptr, ip);
 
 				bool valid;
-				Variant::Operator op = (Variant::Operator)_code_ptr[ip + 4];
-				GD_ERR_BREAK(op >= Variant::OP_MAX);
+				Variant::Operator op = opcode->operation;
 
-				GET_VARIANT_PTR(a, 0);
-				GET_VARIANT_PTR(b, 1);
-				GET_VARIANT_PTR(dst, 2);
+				Variant *a = opcode->left_operand.get_variant_address(variant_addresses);
+				Variant *b = opcode->right_operand.get_variant_address(variant_addresses);
+				Variant *dst = opcode->destination.get_variant_address(variant_addresses);
+
 				// Compute signatures (types of operands) so it can be optimized when matching.
-				uint32_t op_signature = _code_ptr[ip + 5];
-				uint32_t actual_signature = (a->get_type() << 8) | (b->get_type());
+				auto actual_signature = GDScriptOpcodes::Signature(a->get_type(), b->get_type());
 
 #ifdef DEBUG_ENABLED
 				if (op == Variant::OP_DIVIDE || op == Variant::OP_MODULE) {
 					// Don't optimize division and modulo since there's not check for division by zero with validated calls.
-					op_signature = 0xFFFF;
-					_code_ptr[ip + 5] = op_signature;
+					opcode->signature = GDScriptOpcodes::Signature::OPAQUE;
 				}
 #endif
 
 				// Check if this is the first run. If so, store the current signature for the optimized path.
-				if (unlikely(op_signature == 0)) {
+				if (unlikely(opcode->signature.is_uninit())) {
 					static Mutex initializer_mutex;
 					initializer_mutex.lock();
-					Variant::Type a_type = (Variant::Type)((actual_signature >> 8) & 0xFF);
-					Variant::Type b_type = (Variant::Type)(actual_signature & 0xFF);
+
+					Variant::Type a_type = actual_signature.get_left_type();
+					Variant::Type b_type = actual_signature.get_right_type();
 
 					Variant::ValidatedOperatorEvaluator op_func = Variant::get_validated_operator_evaluator(op, a_type, b_type);
 
@@ -732,21 +733,19 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 						op_func(a, b, dst);
 
 						// Check again in case another thread already set it.
-						if (_code_ptr[ip + 5] == 0) {
-							_code_ptr[ip + 5] = actual_signature;
-							_code_ptr[ip + 6] = static_cast<int>(ret_type);
-							Variant::ValidatedOperatorEvaluator *tmp = reinterpret_cast<Variant::ValidatedOperatorEvaluator *>(&_code_ptr[ip + 7]);
-							*tmp = op_func;
+						if (opcode->signature.is_uninit()) {
+							opcode->signature = actual_signature;
+							opcode->return_type = ret_type;
+							opcode->operator_fn = op_func;
 						}
 					}
 					initializer_mutex.unlock();
-				} else if (likely(op_signature == actual_signature)) {
+				} else if (likely(opcode->signature == actual_signature)) {
 					// If the signature matches, we can use the optimized path.
-					Variant::Type ret_type = static_cast<Variant::Type>(_code_ptr[ip + 6]);
-					Variant::ValidatedOperatorEvaluator op_func = *reinterpret_cast<Variant::ValidatedOperatorEvaluator *>(&_code_ptr[ip + 7]);
+					Variant::ValidatedOperatorEvaluator op_func = opcode->operator_fn.get();
 
 					// Make sure the return value has the correct type.
-					VariantInternal::initialize(dst, ret_type);
+					VariantInternal::initialize(dst, opcode->return_type);
 					op_func(a, b, dst);
 				} else {
 					// If the signature doesn't match, we have to use the slow path.
@@ -771,7 +770,7 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 					*dst = ret;
 #endif
 				}
-				ip += 7 + _pointer_size;
+				ip += opcode->size();
 			}
 			DISPATCH_OPCODE;
 
@@ -1080,6 +1079,9 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 				GET_VARIANT_PTR(index, 1);
 				GET_VARIANT_PTR(dst, 2);
 
+				//std::printf("Get indexed: ");
+				//std::printf("src: %zu dst: %zu\n", src, dst);
+
 				int index_getter = _code_ptr[ip + 4];
 				GD_ERR_BREAK(index_getter < 0 || index_getter >= _indexed_getters_count);
 				const Variant::ValidatedIndexedGetter getter = _indexed_getters_ptr[index_getter];
@@ -1256,7 +1258,6 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 
 				int index = _code_ptr[ip + 3];
 				GD_ERR_BREAK(index < 0 || index >= gdscript->static_variables.size());
-
 				gdscript->static_variables.write[index] = *value;
 
 				ip += 4;
@@ -1267,6 +1268,8 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 				CHECK_SPACE(4);
 
 				GET_VARIANT_PTR(target, 0);
+				//std::printf("Get Static: ");
+				//std::printf("ptr: %zu target: %zu\n", _code_ptr + ip + 1 * sizeof(size_t), target);
 
 				GET_VARIANT_PTR(_class, 1);
 				GDScript *gdscript = Object::cast_to<GDScript>(_class->operator Object *());

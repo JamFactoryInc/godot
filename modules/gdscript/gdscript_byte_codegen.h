@@ -31,11 +31,16 @@
 #ifndef GDSCRIPT_BYTE_CODEGEN_H
 #define GDSCRIPT_BYTE_CODEGEN_H
 
+#include "gdscript_opcodes.h"
 #include "gdscript_codegen.h"
 #include "gdscript_function.h"
 #include "gdscript_utility_functions.h"
 
+#include <cstdio>
+
 class GDScriptByteCodeGenerator : public GDScriptCodeGenerator {
+	friend class OpcodeWriter;
+
 	struct StackSlot {
 		Variant::Type type = Variant::NIL;
 		bool can_contain_object = true;
@@ -373,25 +378,347 @@ class GDScriptByteCodeGenerator : public GDScriptCodeGenerator {
 		return -1; // Unreachable.
 	}
 
+	char* opcode_name(GDScriptFunction::Opcode p_code) {
+		switch (p_code) {
+			case GDScriptFunction::OPCODE_OPERATOR:
+				return "op";
+			case GDScriptFunction::OPCODE_OPERATOR_VALIDATED:
+				return "op-VAL";
+			case GDScriptFunction::OPCODE_TYPE_TEST_BUILTIN:
+				return "type_test-BIN";
+			case GDScriptFunction::OPCODE_TYPE_TEST_ARRAY:
+				return "type_test-ARR";
+			case GDScriptFunction::OPCODE_TYPE_TEST_NATIVE:
+				return "type_test-NAT";
+			case GDScriptFunction::OPCODE_TYPE_TEST_SCRIPT:
+				return "type_test-SCR";
+			case GDScriptFunction::OPCODE_SET_KEYED:
+				return "set_key";
+			case GDScriptFunction::OPCODE_SET_KEYED_VALIDATED:
+				return "set_key-VAL";
+			case GDScriptFunction::OPCODE_SET_INDEXED_VALIDATED:
+				return "set_idx-VAL";
+			case GDScriptFunction::OPCODE_GET_KEYED:
+				return "get_key";
+			case GDScriptFunction::OPCODE_GET_KEYED_VALIDATED:
+				return "get_key-VAL";
+			case GDScriptFunction::OPCODE_GET_INDEXED_VALIDATED:
+				return "get_idx-VAL";
+			case GDScriptFunction::OPCODE_SET_NAMED:
+				return "set_named";
+			case GDScriptFunction::OPCODE_SET_NAMED_VALIDATED:
+				return "set_named-VAL";
+			case GDScriptFunction::OPCODE_GET_NAMED:
+				return "get_named";
+			case GDScriptFunction::OPCODE_GET_NAMED_VALIDATED:
+				return "get_named-VAL";
+			case GDScriptFunction::OPCODE_SET_MEMBER:
+				return "set_mem";
+			case GDScriptFunction::OPCODE_GET_MEMBER:
+				return "get_mem";
+			case GDScriptFunction::OPCODE_SET_STATIC_VARIABLE:
+				return "set_static";
+			case GDScriptFunction::OPCODE_GET_STATIC_VARIABLE:
+				return "get_static";
+			case GDScriptFunction::OPCODE_ASSIGN:
+				return "set";
+			case GDScriptFunction::OPCODE_ASSIGN_NULL:
+				return "set_null";
+			case GDScriptFunction::OPCODE_ASSIGN_TRUE:
+				return "set_true";
+			case GDScriptFunction::OPCODE_ASSIGN_FALSE:
+				return "set_false";
+			case GDScriptFunction::OPCODE_ASSIGN_TYPED_BUILTIN:
+				return "set_typed-BIN";
+			case GDScriptFunction::OPCODE_ASSIGN_TYPED_ARRAY:
+				return "set_typed-ARR";
+			case GDScriptFunction::OPCODE_ASSIGN_TYPED_NATIVE:
+				return "set_typed-NAT";
+			case GDScriptFunction::OPCODE_ASSIGN_TYPED_SCRIPT:
+				return "set_typed-SCR";
+			case GDScriptFunction::OPCODE_CAST_TO_BUILTIN:
+				return "cast_to-BIN";
+			case GDScriptFunction::OPCODE_CAST_TO_NATIVE:
+				return "cast_to-NAT";
+			case GDScriptFunction::OPCODE_CAST_TO_SCRIPT:
+				return "cast_to-SCR";
+			case GDScriptFunction::OPCODE_CONSTRUCT:
+				return "construct";
+			case GDScriptFunction::OPCODE_CONSTRUCT_VALIDATED:
+				return "construct-VAL";
+			case GDScriptFunction::OPCODE_CONSTRUCT_ARRAY:
+				return "construct-ARR";
+			case GDScriptFunction::OPCODE_CONSTRUCT_TYPED_ARRAY:
+				return "construct-TYARR";
+			case GDScriptFunction::OPCODE_CONSTRUCT_DICTIONARY:
+				return "construct-DICT";
+			case GDScriptFunction::OPCODE_CALL:
+				return "call";
+			case GDScriptFunction::OPCODE_CALL_RETURN:
+				return "call_ret";
+			case GDScriptFunction::OPCODE_CALL_ASYNC:
+				return "call_async";
+			case GDScriptFunction::OPCODE_CALL_UTILITY:
+				return "call_util";
+			case GDScriptFunction::OPCODE_CALL_UTILITY_VALIDATED:
+				return "call_util-VAL";
+			case GDScriptFunction::OPCODE_CALL_GDSCRIPT_UTILITY:
+				return "call_gdutil";
+			case GDScriptFunction::OPCODE_CALL_BUILTIN_TYPE_VALIDATED:
+				return "call_bin_ty-VAL";
+			case GDScriptFunction::OPCODE_CALL_SELF_BASE:
+				return "call_self_base";
+			case GDScriptFunction::OPCODE_CALL_METHOD_BIND:
+				return "call_bind";
+			case GDScriptFunction::OPCODE_CALL_METHOD_BIND_RET:
+				return "call_bind_ret";
+			case GDScriptFunction::OPCODE_CALL_BUILTIN_STATIC:
+				return "call_bin_static";
+			case GDScriptFunction::OPCODE_CALL_NATIVE_STATIC:
+				return "call_nate_static";
+			case GDScriptFunction::OPCODE_CALL_NATIVE_STATIC_VALIDATED_RETURN:
+				return "call_nat_static-VAL_RET";
+			case GDScriptFunction::OPCODE_CALL_NATIVE_STATIC_VALIDATED_NO_RETURN:
+				return "call_nat_static-VAL_NORET";
+			case GDScriptFunction::OPCODE_CALL_METHOD_BIND_VALIDATED_RETURN:
+				return "call_bind-VAL_RET";
+			case GDScriptFunction::OPCODE_CALL_METHOD_BIND_VALIDATED_NO_RETURN:
+				return "call_bind-VAL_NORET";
+			case GDScriptFunction::OPCODE_AWAIT:
+				return "await";
+			case GDScriptFunction::OPCODE_AWAIT_RESUME:
+				return "resume";
+			case GDScriptFunction::OPCODE_CREATE_LAMBDA:
+				return "create_lambda";
+			case GDScriptFunction::OPCODE_CREATE_SELF_LAMBDA:
+				return "create_self_lambda";
+			case GDScriptFunction::OPCODE_JUMP:
+				return "jump";
+			case GDScriptFunction::OPCODE_JUMP_IF:
+				return "jump_if";
+			case GDScriptFunction::OPCODE_JUMP_IF_NOT:
+				return "jump_if_not";
+			case GDScriptFunction::OPCODE_JUMP_TO_DEF_ARGUMENT:
+				return "jump_to_def_arg";
+			case GDScriptFunction::OPCODE_JUMP_IF_SHARED:
+				return "jump_if_shared";
+			case GDScriptFunction::OPCODE_RETURN:
+				return "return";
+			case GDScriptFunction::OPCODE_RETURN_TYPED_BUILTIN:
+				return "return-BIN_TY";
+			case GDScriptFunction::OPCODE_RETURN_TYPED_ARRAY:
+				return "return-TYARR";
+			case GDScriptFunction::OPCODE_RETURN_TYPED_NATIVE:
+				return "return-NAT";
+			case GDScriptFunction::OPCODE_RETURN_TYPED_SCRIPT:
+				return "return-SCR";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN:
+				return "iter_begin";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_INT:
+				return "iter_begin_int";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_FLOAT:
+				return "iter_begin_float";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_VECTOR2:
+				return "iter_begin_vec2";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_VECTOR2I:
+				return "iter_begin_vec2i";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_VECTOR3:
+				return "iter_begin_vec3";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_VECTOR3I:
+				return "iter_begin_vec3i";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_STRING:
+				return "iter_begin_str";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_DICTIONARY:
+				return "iter_begin_dict";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_ARRAY:
+				return "iter_begin_arr";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_PACKED_BYTE_ARRAY:
+				return "iter_begin_pbytearr";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_PACKED_INT32_ARRAY:
+				return "iter_begin_pi32arr";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_PACKED_INT64_ARRAY:
+				return "iter_begin_pi64arr";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_PACKED_FLOAT32_ARRAY:
+				return "iter_begin_pf32arr";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_PACKED_FLOAT64_ARRAY:
+				return "iter_begin_pf642arr";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_PACKED_STRING_ARRAY:
+				return "iter_begin_pstrarr";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_PACKED_VECTOR2_ARRAY:
+				return "iter_begin_pvec2arr";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_PACKED_VECTOR3_ARRAY:
+				return "iter_begin_pvec3arr";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_PACKED_COLOR_ARRAY:
+				return "iter_begin_pcolarr";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_PACKED_VECTOR4_ARRAY:
+				return "iter_begin_pvec4arr";
+			case GDScriptFunction::OPCODE_ITERATE_BEGIN_OBJECT:
+				return "iter_begin_object";
+			case GDScriptFunction::OPCODE_ITERATE:
+				return "iterate";
+			case GDScriptFunction::OPCODE_ITERATE_INT:
+				return "iterate_int";
+			case GDScriptFunction::OPCODE_ITERATE_FLOAT:
+				return "iterate_float";
+			case GDScriptFunction::OPCODE_ITERATE_VECTOR2:
+				break;
+			case GDScriptFunction::OPCODE_ITERATE_VECTOR2I:
+				break;
+			case GDScriptFunction::OPCODE_ITERATE_VECTOR3:
+				break;
+			case GDScriptFunction::OPCODE_ITERATE_VECTOR3I:
+				break;
+			case GDScriptFunction::OPCODE_ITERATE_STRING:
+				break;
+			case GDScriptFunction::OPCODE_ITERATE_DICTIONARY:
+				break;
+			case GDScriptFunction::OPCODE_ITERATE_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_ITERATE_PACKED_BYTE_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_ITERATE_PACKED_INT32_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_ITERATE_PACKED_INT64_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_ITERATE_PACKED_FLOAT32_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_ITERATE_PACKED_FLOAT64_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_ITERATE_PACKED_STRING_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_ITERATE_PACKED_VECTOR2_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_ITERATE_PACKED_VECTOR3_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_ITERATE_PACKED_COLOR_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_ITERATE_PACKED_VECTOR4_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_ITERATE_OBJECT:
+				break;
+			case GDScriptFunction::OPCODE_STORE_GLOBAL:
+				break;
+			case GDScriptFunction::OPCODE_STORE_NAMED_GLOBAL:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_BOOL:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_INT:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_FLOAT:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_STRING:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_VECTOR2:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_VECTOR2I:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_RECT2:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_RECT2I:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_VECTOR3:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_VECTOR3I:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_TRANSFORM2D:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_VECTOR4:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_VECTOR4I:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_PLANE:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_QUATERNION:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_AABB:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_BASIS:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_TRANSFORM3D:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_PROJECTION:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_COLOR:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_STRING_NAME:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_NODE_PATH:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_RID:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_OBJECT:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_CALLABLE:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_SIGNAL:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_DICTIONARY:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_PACKED_BYTE_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_PACKED_INT32_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_PACKED_INT64_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_PACKED_FLOAT32_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_PACKED_FLOAT64_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_PACKED_STRING_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_PACKED_VECTOR2_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_PACKED_VECTOR3_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_PACKED_COLOR_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_TYPE_ADJUST_PACKED_VECTOR4_ARRAY:
+				break;
+			case GDScriptFunction::OPCODE_ASSERT:
+				return "assert";
+			case GDScriptFunction::OPCODE_BREAKPOINT:
+				return "breakpt";
+			case GDScriptFunction::OPCODE_LINE:
+				return "L";
+			case GDScriptFunction::OPCODE_END:
+				return "end";
+			default:
+				return "nil";
+		}
+		return "nil";
+	}
+
 	void append_opcode(GDScriptFunction::Opcode p_code) {
+		if (p_code == GDScriptFunction::Opcode::OPCODE_LINE) {
+			std::printf("\n#L");
+		} else {
+			std::printf("\n\t%-15s", opcode_name(p_code));
+		}
+		
 		opcodes.push_back(p_code);
 	}
 
 	void append_opcode_and_argcount(GDScriptFunction::Opcode p_code, int p_argument_count) {
+		std::printf("\n\t%s(%i)", opcode_name(p_code), p_argument_count);
 		opcodes.push_back(p_code);
 		opcodes.push_back(p_argument_count);
 		instr_args_max = MAX(instr_args_max, p_argument_count);
 	}
 
 	void append(int p_code) {
+		std::printf("%-8i", p_code);
 		opcodes.push_back(p_code);
 	}
 
 	void append(const Address &p_address) {
+        std::printf(" addr %-8i", address_of(p_address));
 		opcodes.push_back(address_of(p_address));
 	}
 
 	void append(const StringName &p_name) {
+		std::printf(" str %-8s", (p_name.operator String()).ptr());
 		opcodes.push_back(get_name_map_pos(p_name));
 	}
 

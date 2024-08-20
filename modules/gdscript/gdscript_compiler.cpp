@@ -2474,6 +2474,15 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 	return gd_function;
 }
 
+//void *GDScriptCompiler::optimize_function(GDScriptFunction &fn) {
+//	int *code = fn._code_ptr;
+//	int line = 0;
+//	GDScriptFunction::Opcode op;
+//	while (op != GDScriptFunction::Opcode::OPCODE_END) {
+//
+//	}
+//}
+
 GDScriptFunction *GDScriptCompiler::_make_static_initializer(Error &r_error, GDScript *p_script, const GDScriptParser::ClassNode *p_class) {
 	r_error = OK;
 	CodeGen codegen;

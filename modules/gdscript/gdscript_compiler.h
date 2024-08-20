@@ -168,6 +168,7 @@ class GDScriptCompiler {
 	void _get_function_ptr_replacements(HashMap<GDScriptFunction *, GDScriptFunction *> &r_replacements, const FunctionLambdaInfo &p_old_info, const FunctionLambdaInfo *p_new_info);
 	void _get_function_ptr_replacements(HashMap<GDScriptFunction *, GDScriptFunction *> &r_replacements, const Vector<FunctionLambdaInfo> &p_old_infos, const Vector<FunctionLambdaInfo> *p_new_infos);
 	void _get_function_ptr_replacements(HashMap<GDScriptFunction *, GDScriptFunction *> &r_replacements, const ScriptLambdaInfo &p_old_info, const ScriptLambdaInfo *p_new_info);
+	void *GDScriptCompiler::optimize_function(GDScriptFunction &fn);
 	int err_line = 0;
 	int err_column = 0;
 	StringName source;
