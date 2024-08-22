@@ -1688,13 +1688,19 @@ void GDScriptByteCodeGenerator::write_continue() {
 }
 
 void GDScriptByteCodeGenerator::write_breakpoint() {
+#ifdef DEBUG_ENABLED
 	append_opcode(GDScriptFunction::OPCODE_BREAKPOINT);
+#endif
 }
 
 void GDScriptByteCodeGenerator::write_newline(int p_line) {
+	// there's no reason to generate line instructions in release,
+	// as they're only used for user debugging purposes and significantly worsen VM performance
+#ifdef DEBUG_ENABLED
 	append_opcode(GDScriptFunction::OPCODE_LINE);
 	append(p_line);
 	current_line = p_line;
+#endif
 }
 
 void GDScriptByteCodeGenerator::write_return(const Address &p_return_value) {
