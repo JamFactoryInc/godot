@@ -1691,11 +1691,16 @@ void GDScriptByteCodeGenerator::write_breakpoint() {
 	append_opcode(GDScriptFunction::OPCODE_BREAKPOINT);
 }
 
+//#define COMPILE_LINE_OPCODES
+
 void GDScriptByteCodeGenerator::write_newline(int p_line) {
+#ifdef COMPILE_LINE_OPCODES
 	append_opcode(GDScriptFunction::OPCODE_LINE);
 	append(p_line);
 	current_line = p_line;
+#endif
 }
+
 
 void GDScriptByteCodeGenerator::write_return(const Address &p_return_value) {
 	if (!function->return_type.has_type || p_return_value.type.has_type) {

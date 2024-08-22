@@ -49,12 +49,18 @@ struct EncodedPointer {
 	int ptr_parts[EncodedPointer::PTR_SIZE];
 
 public:
+	// inline EncodedPointer(POINTER_TYPE ptr) {
+	// 	*this = *reinterpret_cast<EncodedPointer<POINTER_TYPE> *>(&ptr);
+	// }
 	EncodedPointer(POINTER_TYPE ptr) {
 		int *data = reinterpret_cast<int *>(&this->ptr_parts);
 		*data = *reinterpret_cast<int *>(&ptr);
 	}
 
-	constexpr POINTER_TYPE get() const {
+	// inline POINTER_TYPE get() const {
+	// 	return reinterpret_cast<POINTER_TYPE>(this);
+	// }
+	constexpr inline POINTER_TYPE get() const {
 		if constexpr (PTR_SIZE == 1) {
 			return reinterpret_cast<POINTER_TYPE>(ptr_parts[0]);
 		} else if constexpr (PTR_SIZE == 2) {
@@ -107,13 +113,11 @@ public:
 		return this->type_data == rhs.type_data;
 	}
 
-	Signature(Variant *left, Variant *right) {
-		this->type_data = (left->get_type() << 8) | right->get_type();
-	}
+	inline Signature(Variant *left, Variant *right) :
+			type_data((left->get_type() << 8) | right->get_type()) { }
 
-	Signature(Variant::Type left_type, Variant::Type right_type) {
-		this->type_data = (left_type << 8) | right_type;
-	}
+	inline Signature(Variant::Type left_type, Variant::Type right_type) :
+			type_data((left_type << 8) | right_type) { }
 
 	inline Variant::Type get_left_type() {
 		return static_cast<Variant::Type>(type_data >> 8);
@@ -128,9 +132,8 @@ public:
 	}
 
 private:
-	Signature(int value) {
-		this->type_data = value;
-	}
+	Signature(int value) :
+			type_data(value) { }
 };
 
 
@@ -155,12 +158,12 @@ private:
 	public:                                                                                                                                    \
 		const GDScriptFunction::Opcode opcode;                                                                                                 \
 		FIELDS SEPARATE(__VA_ARGS__, (_IGNORE, , ), (_IGNORE, , ), (_IGNORE, , ), (_IGNORE, , ), (_IGNORE, , ), (_IGNORE, , ), (_IGNORE, , )); \
-		constexpr int size() {                                                                                                                 \
+		constexpr inline int size() {                                                                                                          \
 			return sizeof(GDScriptOpcodes::BaseOpcode<OPCODE>) / sizeof(int);                                                                  \
 		}                                                                                                                                      \
-		static BaseOpcode<OPCODE> *from_instr_ptr(int *code_ptr, int instr_ptr) {                                                              \
-			int *opcode_addr = &code_ptr[instr_ptr];                                                                                           \
-			return reinterpret_cast<BaseOpcode<OPCODE> *>(opcode_addr);                                                                        \
+		static BaseOpcode<OPCODE> &from_instr_ptr(int *code_ptr, int instr_ptr) {                                                              \
+			int &opcode_addr = code_ptr[instr_ptr];                                                                                           \
+			return reinterpret_cast<BaseOpcode<OPCODE> &>(opcode_addr);                                                                        \
 		};                                                                                                                                     \
 	};
 

@@ -695,11 +695,11 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 				auto opcode = GDScriptOpcodes::BaseOpcode<OPCODE_OPERATOR>::from_instr_ptr(_code_ptr, ip);
 
 				bool valid;
-				Variant::Operator op = opcode->operation;
+				Variant::Operator op = opcode.operation;
 
-				Variant *a = opcode->left_operand.get_variant_address(variant_addresses);
-				Variant *b = opcode->right_operand.get_variant_address(variant_addresses);
-				Variant *dst = opcode->destination.get_variant_address(variant_addresses);
+				Variant *a = opcode.left_operand.get_variant_address(variant_addresses);
+				Variant *b = opcode.right_operand.get_variant_address(variant_addresses);
+				Variant *dst = opcode.destination.get_variant_address(variant_addresses);
 
 				// Compute signatures (types of operands) so it can be optimized when matching.
 				auto actual_signature = GDScriptOpcodes::Signature(a->get_type(), b->get_type());
@@ -707,12 +707,12 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 #ifdef DEBUG_ENABLED
 				if (op == Variant::OP_DIVIDE || op == Variant::OP_MODULE) {
 					// Don't optimize division and modulo since there's not check for division by zero with validated calls.
-					opcode->signature = GDScriptOpcodes::Signature::OPAQUE;
+					opcode.signature = GDScriptOpcodes::Signature::OPAQUE;
 				}
 #endif
 
 				// Check if this is the first run. If so, store the current signature for the optimized path.
-				if (unlikely(opcode->signature.is_uninit())) {
+				if (unlikely(opcode.signature.is_uninit())) {
 					static Mutex initializer_mutex;
 					initializer_mutex.lock();
 
@@ -733,19 +733,19 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 						op_func(a, b, dst);
 
 						// Check again in case another thread already set it.
-						if (opcode->signature.is_uninit()) {
-							opcode->signature = actual_signature;
-							opcode->return_type = ret_type;
-							opcode->operator_fn = op_func;
+						if (opcode.signature.is_uninit()) {
+							opcode.signature = actual_signature;
+							opcode.return_type = ret_type;
+							opcode.operator_fn = op_func;
 						}
 					}
 					initializer_mutex.unlock();
-				} else if (likely(opcode->signature == actual_signature)) {
+				} else if (likely(opcode.signature == actual_signature)) {
 					// If the signature matches, we can use the optimized path.
-					Variant::ValidatedOperatorEvaluator op_func = opcode->operator_fn.get();
+					Variant::ValidatedOperatorEvaluator op_func = opcode.operator_fn.get();
 
 					// Make sure the return value has the correct type.
-					VariantInternal::initialize(dst, opcode->return_type);
+					VariantInternal::initialize(dst, opcode.return_type);
 					op_func(a, b, dst);
 				} else {
 					// If the signature doesn't match, we have to use the slow path.
@@ -770,7 +770,7 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 					*dst = ret;
 #endif
 				}
-				ip += opcode->size();
+				ip += opcode.size();
 			}
 			DISPATCH_OPCODE;
 
