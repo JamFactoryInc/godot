@@ -1,0 +1,36 @@
+#!/usr/bin/env python
+
+Import("env")
+Import("env_modules")
+
+env_sljit = env_modules.Clone()
+
+# Thirdparty source files
+
+thirdparty_obj = []
+
+if env["builtin_pcre2"]:
+    thirdparty_dir = "#thirdparty/sljit/src/"
+    thirdparty_flags = ["HAVE_CONFIG_H", "SUPPORT_UNICODE"]
+
+    thirdparty_sources = [
+        "sljitLir.c",
+    ]
+
+    thirdparty_sources = [thirdparty_dir + file for file in thirdparty_sources]
+
+    env_sljit.Prepend(CPPPATH=[thirdparty_dir])
+    env_sljit.Append(CPPDEFINES=thirdparty_flags)
+
+    env.modules_sources += thirdparty_obj
+
+
+# Godot source files
+
+module_obj = []
+
+env_sljit.add_source_files(module_obj, "*.cpp")
+env.modules_sources += module_obj
+
+# Needed to force rebuilding the module files when the thirdparty library is updated.
+env.Depends(module_obj, thirdparty_obj)

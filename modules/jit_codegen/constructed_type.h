@@ -1,0 +1,8 @@
+//
+// Created by jam on 13/09/2024.
+//
+
+#ifndef GODOT_CONSTRUCTED_TYPE_H
+#define GODOT_CONSTRUCTED_TYPE_H
+
+#endif //GODOT_CONSTRUCTED_TYPE_H

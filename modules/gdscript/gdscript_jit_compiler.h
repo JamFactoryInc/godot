@@ -1,0 +1,8 @@
+//
+// Created by jam on 5/09/2024.
+//
+
+#ifndef GODOT_GDSCRIPT_JIT_COMPILER_H
+#define GODOT_GDSCRIPT_JIT_COMPILER_H
+
+#endif //GODOT_GDSCRIPT_JIT_COMPILER_H

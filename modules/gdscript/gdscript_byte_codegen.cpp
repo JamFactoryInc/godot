@@ -318,6 +318,7 @@ GDScriptFunction *GDScriptByteCodeGenerator::write_end() {
 		for (const KeyValue<Variant::ValidatedIndexedGetter, int> &E : indexed_getters_map) {
 			function->indexed_getters.write[E.value] = E.key;
 		}
+		fn_ptrs_offset += indexed_getters_map.size();
 	} else {
 		function->_indexed_getters_count = 0;
 		function->_indexed_getters_ptr = nullptr;
