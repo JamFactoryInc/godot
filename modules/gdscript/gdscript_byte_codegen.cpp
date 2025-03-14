@@ -216,9 +216,17 @@ GDScriptFunction *GDScriptByteCodeGenerator::write_end() {
 		}
 		function->_global_names_count = function->global_names.size();
 
+		function->global_name_invocations.resize(function->global_names.size());
+		for (int i = 0; i < function->global_name_invocations.size(); i++) {
+			function->global_name_invocations.write[i] = 1;
+		}
+		function->_global_name_invocations_ptr = function->global_name_invocations.ptrw();
+
 	} else {
 		function->_global_names_ptr = nullptr;
 		function->_global_names_count = 0;
+
+		function->_global_name_invocations_ptr = nullptr;
 	}
 
 	if (opcodes.size()) {
@@ -1692,10 +1700,13 @@ void GDScriptByteCodeGenerator::write_breakpoint() {
 }
 
 void GDScriptByteCodeGenerator::write_newline(int p_line) {
+#ifdef DEBUG_ENABLED
 	append_opcode(GDScriptFunction::OPCODE_LINE);
 	append(p_line);
 	current_line = p_line;
+#endif
 }
+
 
 void GDScriptByteCodeGenerator::write_return(const Address &p_return_value) {
 	if (!function->return_type.has_type || p_return_value.type.has_type) {

@@ -79,6 +79,8 @@ typedef Vector<Color> PackedColorArray;
 typedef Vector<Vector4> PackedVector4Array;
 
 class Variant {
+	//friend class GDScriptFunction;
+
 public:
 	// If this changes the table in variant_op must be updated
 	enum Type {

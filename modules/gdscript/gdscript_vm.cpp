@@ -31,6 +31,8 @@
 #include "gdscript.h"
 #include "gdscript_function.h"
 #include "gdscript_lambda_callable.h"
+#include "gdscript_jit_compiler.h"
+#include <cstdio>
 
 #include "core/os/os.h"
 
@@ -370,6 +372,12 @@ void (*type_init_function_table[])(Variant *) = {
 
 #define OPCODE(m_op) \
 	m_op:
+#define GET_VARIANT(variant_idx) variant_idx.get_variant_ptr(variant_addresses)
+#define OPCODE1(m_op)                                                      \
+	m_op: {                                                           \
+		auto opcode = StaticOpcode<m_op>::from_instr_ptr(_code_ptr, ip); \
+		CHECK_SPACE(opcode.size());                                        \
+		ip += opcode.size();
 #define OPCODE_WHILE(m_test)
 #define OPCODES_END \
 	OPSEXIT:
@@ -388,6 +396,13 @@ void (*type_init_function_table[])(Variant *) = {
 #else
 #define OPCODES_TABLE
 #define OPCODE(m_op) case m_op:
+#define GET_VARIANT(variant_idx) variant_idx.get_variant_ptr(variant_addresses)
+#define OPCODE1(m_op)                                                      \
+	case m_op: {                                                           \
+		auto opcode = StaticOpcode<m_op>::from_instr_ptr(_code_ptr, ip); \
+		CHECK_SPACE(opcode.size());                                        \
+		ip += opcode.size();
+
 #define OPCODE_WHILE(m_test) while (m_test)
 #define OPCODES_END
 #define OPCODES_OUT
@@ -444,6 +459,90 @@ void (*type_init_function_table[])(Variant *) = {
 
 #define METHOD_CALL_ON_NULL_VALUE_ERROR(method_pointer) "Cannot call method '" + (method_pointer)->get_name() + "' on a null value."
 #define METHOD_CALL_ON_FREED_INSTANCE_ERROR(method_pointer) "Cannot call method '" + (method_pointer)->get_name() + "' on a previously freed instance."
+
+void GDScriptFunction::_on_stack_replace(GDScriptFunction &fn, Variant *&old_stack) {
+	// ! recalculate stack
+
+	// stack size values before inlining
+	int old_stack_size = _stack_size;
+	int old_instr_arg_size_bytes = sizeof(Variant *) * _instruction_args_size;
+	int old_stack_size_bytes_no_instr_args = sizeof(Variant *) * 3 + sizeof(Variant *) * _stack_size;
+
+	_stack_size = _stack_size + fn._stack_size;
+	// make room for the larger instr args width of the two functions
+	_instruction_args_size = MAX(_instruction_args_size, fn._instruction_args_size);
+
+	int new_instr_arg_size_bytes = sizeof(Variant *) * _instruction_args_size;
+	int new_stack_size_bytes = sizeof(Variant *) * 3 + new_instr_arg_size_bytes + sizeof(Variant) * _stack_size;
+
+	// we have to use malloc here since we're re-sizing the stack long after the beginning of the function call
+	// this will be re-allocated via alloca again when the enclosing function starts
+	Variant *new_stack = (Variant *)malloc(new_stack_size_bytes);
+	// copy the current stack to the beginning of the new stack
+	memcpy(new_stack, old_stack, old_stack_size_bytes_no_instr_args);
+	// copy the current instruction args to the beginning of the new stack's instruction arg buffer
+	memcpy(new_stack + new_stack_size_bytes - new_instr_arg_size_bytes, old_stack + old_stack_size_bytes_no_instr_args, old_instr_arg_size_bytes);
+
+	old_stack = new_stack;
+
+	// ! Concat function values
+
+	// track temp slots from the inlined function that do not have the same type as
+	// the enclosing function's respective temp slots
+	auto temp_slots_to_remap = HashMap<int, int>();
+
+	for (const KeyValue<int, Variant::Type> &E : fn.temporary_slots) {
+		int remapped_stack_index = E.key + old_stack_size;
+		temporary_slots[remapped_stack_index] = E.value;
+		type_init_function_table[E.value](&new_stack[remapped_stack_index]);
+	}
+
+	// if the origin scripts differ, we have to handle the fact that calls will behave differently
+	if (_script != fn._script) {
+		// TODO remap
+	}
+
+	// copy
+	int old_code_size = code.size();
+    int new_code_size = old_code_size + fn.code.size();
+	code.resize(old_code_size + fn.code.size());
+	memcpy(code.ptrw() + old_code_size * sizeof(int), fn.code.ptr(), fn.code.size() * sizeof(int));
+
+	// calculate new
+
+	// ! fix inlined fn's bytecode to point to new offsets
+
+//    auto opcode = DynOpcode::from_opcode_ptr(code.ptrw(), code.ptrw());
+//    do {
+//
+//    } while ((opcode = opcode->next()));
+}
+
+//void optimize_function(int *code) {
+//
+//
+//    auto opcode = DynOpcode::from_opcode_ptr(code, code);
+//    do {
+//
+//    } while ((opcode = opcode->next()));
+//}
+
+// the following efficiently check if any of the given ptrs are null
+// this approach using reinterpret_cast allows use of & on pointer types,
+// which returns 0 if any of the input ptrs are 0 (nullptr)
+// e.g. 0b1100 & 0b0000 -> 0b0000, 0b1100 & 0b0000 & 0b0011 -> 0b0000, etc.
+
+static inline bool check_any_null(Variant *_1) {
+	return !reinterpret_cast<size_t>(_1);
+}
+
+static inline bool check_any_null(Variant *_1, Variant *_2) {
+	return !(reinterpret_cast<size_t>(_1) & reinterpret_cast<size_t>(_2));
+}
+
+static inline bool check_any_null(Variant *_1, Variant *_2, Variant *_3) {
+	return !((reinterpret_cast<size_t>(_1) & reinterpret_cast<size_t>(_2)) & reinterpret_cast<size_t>(_3));
+}
 
 Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_args, int p_argcount, Callable::CallError &r_err, CallState *p_state) {
 	OPCODES_TABLE;
@@ -507,7 +606,6 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 		script = p_state->script;
 		p_instance = p_state->instance;
 		defarg = p_state->defarg;
-
 	} else {
 		if (p_argcount != _argument_count) {
 			if (p_argcount > _argument_count) {
@@ -579,7 +677,7 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 		} else {
 			instruction_args = nullptr;
 		}
-
+		
 		for (const KeyValue<int, Variant::Type> &E : temporary_slots) {
 			type_init_function_table[E.value](&stack[E.key]);
 		}
@@ -596,6 +694,8 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 	memnew_placement(&stack[ADDR_STACK_NIL], Variant);
 
 	String err_text;
+
+	//printf("Running\n");
 
 #ifdef DEBUG_ENABLED
 
@@ -652,6 +752,11 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 
 #endif
 
+#define CHECK_NULL(...)                          \
+	if (unlikely(check_any_null(__VA_ARGS__))) { \
+		OPCODE_BREAK;                            \
+	}
+
 #define LOAD_INSTRUCTION_ARGS                   \
 	int instr_arg_count = _code_ptr[ip + 1];    \
 	for (int i = 0; i < instr_arg_count; i++) { \
@@ -686,37 +791,39 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 #else
 	OPCODE_WHILE(true) {
 #endif
+		// if (stack_cache) {
+		// 	printf("OP %i ", _code_ptr[ip]);
+		// }
 
 		OPCODE_SWITCH(_code_ptr[ip]) {
-			OPCODE(OPCODE_OPERATOR) {
-				constexpr int _pointer_size = sizeof(Variant::ValidatedOperatorEvaluator) / sizeof(*_code_ptr);
-				CHECK_SPACE(7 + _pointer_size);
+			OPCODE1(OPCODE_OPERATOR) {
 
 				bool valid;
-				Variant::Operator op = (Variant::Operator)_code_ptr[ip + 4];
-				GD_ERR_BREAK(op >= Variant::OP_MAX);
+				Variant::Operator op = opcode.operation;
 
-				GET_VARIANT_PTR(a, 0);
-				GET_VARIANT_PTR(b, 1);
-				GET_VARIANT_PTR(dst, 2);
+				Variant *a = GET_VARIANT(opcode.left);
+				Variant *b = GET_VARIANT(opcode.right);
+				Variant *dst = GET_VARIANT(opcode.dst);
+				// check if any of the operands are null (we also need to check dst, as it is dereferenced in VariantInternal::initialize)
+				CHECK_NULL(a, b, dst)
+
 				// Compute signatures (types of operands) so it can be optimized when matching.
-				uint32_t op_signature = _code_ptr[ip + 5];
-				uint32_t actual_signature = (a->get_type() << 8) | (b->get_type());
+				auto actual_signature = Signature(a, b);
 
 #ifdef DEBUG_ENABLED
 				if (op == Variant::OP_DIVIDE || op == Variant::OP_MODULE) {
 					// Don't optimize division and modulo since there's not check for division by zero with validated calls.
-					op_signature = 0xFFFF;
-					_code_ptr[ip + 5] = op_signature;
+					opcode.signature = Signature::OPAQUE;
 				}
 #endif
 
 				// Check if this is the first run. If so, store the current signature for the optimized path.
-				if (unlikely(op_signature == 0)) {
+				if (unlikely(opcode.signature.is_uninit())) {
 					static Mutex initializer_mutex;
 					initializer_mutex.lock();
-					Variant::Type a_type = (Variant::Type)((actual_signature >> 8) & 0xFF);
-					Variant::Type b_type = (Variant::Type)(actual_signature & 0xFF);
+
+					Variant::Type a_type = actual_signature.get_left_type();
+					Variant::Type b_type = actual_signature.get_right_type();
 
 					Variant::ValidatedOperatorEvaluator op_func = Variant::get_validated_operator_evaluator(op, a_type, b_type);
 
@@ -732,21 +839,21 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 						op_func(a, b, dst);
 
 						// Check again in case another thread already set it.
-						if (_code_ptr[ip + 5] == 0) {
-							_code_ptr[ip + 5] = actual_signature;
-							_code_ptr[ip + 6] = static_cast<int>(ret_type);
-							Variant::ValidatedOperatorEvaluator *tmp = reinterpret_cast<Variant::ValidatedOperatorEvaluator *>(&_code_ptr[ip + 7]);
-							*tmp = op_func;
+						if (opcode.signature.is_uninit()) {
+							opcode.signature = actual_signature;
+							opcode.return_type = ret_type;
+							opcode.operator_fn = op_func;
 						}
 					}
 					initializer_mutex.unlock();
-				} else if (likely(op_signature == actual_signature)) {
+				} else if (likely(opcode.signature == actual_signature)) {
+					
 					// If the signature matches, we can use the optimized path.
-					Variant::Type ret_type = static_cast<Variant::Type>(_code_ptr[ip + 6]);
-					Variant::ValidatedOperatorEvaluator op_func = *reinterpret_cast<Variant::ValidatedOperatorEvaluator *>(&_code_ptr[ip + 7]);
+					Variant::ValidatedOperatorEvaluator op_func = opcode.operator_fn.get();
 
 					// Make sure the return value has the correct type.
-					VariantInternal::initialize(dst, ret_type);
+					VariantInternal::initialize(dst, opcode.return_type);
+
 					op_func(a, b, dst);
 				} else {
 					// If the signature doesn't match, we have to use the slow path.
@@ -771,25 +878,23 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 					*dst = ret;
 #endif
 				}
-				ip += 7 + _pointer_size;
-			}
+			}}
 			DISPATCH_OPCODE;
 
-			OPCODE(OPCODE_OPERATOR_VALIDATED) {
-				CHECK_SPACE(5);
+			OPCODE1(OPCODE_OPERATOR_VALIDATED) {
 
-				int operator_idx = _code_ptr[ip + 4];
-				GD_ERR_BREAK(operator_idx < 0 || operator_idx >= _operator_funcs_count);
-				Variant::ValidatedOperatorEvaluator operator_func = _operator_funcs_ptr[operator_idx];
+				int operator_idx = opcode.operator_idx;
+                GD_ERR_BREAK(operator_idx < 0 || operator_idx >= _operator_funcs_count);
+                Variant::ValidatedOperatorEvaluator operator_func = _operator_funcs_ptr[operator_idx];
 
-				GET_VARIANT_PTR(a, 0);
-				GET_VARIANT_PTR(b, 1);
-				GET_VARIANT_PTR(dst, 2);
+				Variant *a = opcode.left.get_variant_ptr(variant_addresses);
+				Variant *b = opcode.right.get_variant_ptr(variant_addresses);
+				Variant *dst = opcode.dst.get_variant_ptr(variant_addresses);
+				// check if any of the operands are null
+				CHECK_NULL(a, b, dst)
 
 				operator_func(a, b, dst);
-
-				ip += 5;
-			}
+			}}
 			DISPATCH_OPCODE;
 
 			OPCODE(OPCODE_TYPE_TEST_BUILTIN) {
@@ -965,14 +1070,14 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 			}
 			DISPATCH_OPCODE;
 
-			OPCODE(OPCODE_SET_INDEXED_VALIDATED) {
-				CHECK_SPACE(4);
+			OPCODE1(OPCODE_SET_INDEXED_VALIDATED) {
+				Variant *dst = GET_VARIANT(opcode.dst);
+				Variant *index = GET_VARIANT(opcode.index);
+				Variant *value = GET_VARIANT(opcode.value);
 
-				GET_VARIANT_PTR(dst, 0);
-				GET_VARIANT_PTR(index, 1);
-				GET_VARIANT_PTR(value, 2);
+				CHECK_NULL(dst, index, value);
 
-				int index_setter = _code_ptr[ip + 4];
+				int index_setter = opcode.setter_idx;
 				GD_ERR_BREAK(index_setter < 0 || index_setter >= _indexed_setters_count);
 				const Variant::ValidatedIndexedSetter setter = _indexed_setters_ptr[index_setter];
 
@@ -997,8 +1102,7 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 					OPCODE_BREAK;
 				}
 #endif
-				ip += 5;
-			}
+			}}
 			DISPATCH_OPCODE;
 
 			OPCODE(OPCODE_GET_KEYED) {
@@ -1073,14 +1177,17 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 			}
 			DISPATCH_OPCODE;
 
-			OPCODE(OPCODE_GET_INDEXED_VALIDATED) {
-				CHECK_SPACE(4);
+			OPCODE1(OPCODE_GET_INDEXED_VALIDATED) {
+				Variant *src = GET_VARIANT(opcode.src);
+				Variant *index = GET_VARIANT(opcode.index);
+				Variant *dst = GET_VARIANT(opcode.dst);
 
-				GET_VARIANT_PTR(src, 0);
-				GET_VARIANT_PTR(index, 1);
-				GET_VARIANT_PTR(dst, 2);
+				CHECK_NULL(src, index, dst);
 
-				int index_getter = _code_ptr[ip + 4];
+				//std::printf("Get indexed: ");
+				//std::printf("src: %zu dst: %zu\n", src, dst);
+
+				int index_getter = opcode.getter_idx;
 				GD_ERR_BREAK(index_getter < 0 || index_getter >= _indexed_getters_count);
 				const Variant::ValidatedIndexedGetter getter = _indexed_getters_ptr[index_getter];
 
@@ -1101,8 +1208,7 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 					OPCODE_BREAK;
 				}
 #endif
-				ip += 5;
-			}
+			}}
 			DISPATCH_OPCODE;
 
 			OPCODE(OPCODE_SET_NAMED) {
@@ -1245,61 +1351,52 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 			}
 			DISPATCH_OPCODE;
 
-			OPCODE(OPCODE_SET_STATIC_VARIABLE) {
-				CHECK_SPACE(4);
+			OPCODE1(OPCODE_SET_STATIC_VARIABLE) {
+				Variant *value = GET_VARIANT(opcode.value);
+				Variant *_class = GET_VARIANT(opcode._class);
 
-				GET_VARIANT_PTR(value, 0);
+				CHECK_NULL(value, _class);
 
-				GET_VARIANT_PTR(_class, 1);
 				GDScript *gdscript = Object::cast_to<GDScript>(_class->operator Object *());
 				GD_ERR_BREAK(!gdscript);
 
-				int index = _code_ptr[ip + 3];
+				int index = opcode.static_var_idx;
 				GD_ERR_BREAK(index < 0 || index >= gdscript->static_variables.size());
-
 				gdscript->static_variables.write[index] = *value;
-
-				ip += 4;
-			}
+			}}
 			DISPATCH_OPCODE;
 
-			OPCODE(OPCODE_GET_STATIC_VARIABLE) {
-				CHECK_SPACE(4);
+			OPCODE1(OPCODE_GET_STATIC_VARIABLE) {
+				Variant *target = GET_VARIANT(opcode.target);
+				Variant *_class = GET_VARIANT(opcode._class);
 
-				GET_VARIANT_PTR(target, 0);
+				CHECK_NULL(target, _class);
 
-				GET_VARIANT_PTR(_class, 1);
 				GDScript *gdscript = Object::cast_to<GDScript>(_class->operator Object *());
 				GD_ERR_BREAK(!gdscript);
 
-				int index = _code_ptr[ip + 3];
+				int index = opcode.static_var_idx;
 				GD_ERR_BREAK(index < 0 || index >= gdscript->static_variables.size());
 
 				*target = gdscript->static_variables[index];
-
-				ip += 4;
-			}
+			}}
 			DISPATCH_OPCODE;
 
-			OPCODE(OPCODE_ASSIGN) {
-				CHECK_SPACE(3);
-				GET_VARIANT_PTR(dst, 0);
-				GET_VARIANT_PTR(src, 1);
+			OPCODE1(OPCODE_ASSIGN) {
+				Variant *dst = GET_VARIANT(opcode.dst);
+				Variant *src = GET_VARIANT(opcode.src);
+
+				CHECK_NULL(dst, src);
 
 				*dst = *src;
-
-				ip += 3;
-			}
+			}}
 			DISPATCH_OPCODE;
 
-			OPCODE(OPCODE_ASSIGN_NULL) {
-				CHECK_SPACE(2);
-				GET_VARIANT_PTR(dst, 0);
-
+			OPCODE1(OPCODE_ASSIGN_NULL) {
+				Variant *dst = GET_VARIANT(opcode.dst);
+				CHECK_NULL(dst);
 				*dst = Variant();
-
-				ip += 2;
-			}
+			}}
 			DISPATCH_OPCODE;
 
 			OPCODE(OPCODE_ASSIGN_TRUE) {
@@ -1727,11 +1824,52 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 				GD_ERR_BREAK(argc < 0);
 
 				int methodname_idx = _code_ptr[ip + 2];
-				GD_ERR_BREAK(methodname_idx < 0 || methodname_idx >= _global_names_count);
-				const StringName *methodname = &_global_names_ptr[methodname_idx];
 
+				GD_ERR_BREAK(methodname_idx < 0 || methodname_idx >= _global_names_count);
+				const StringName &methodname = _global_names_ptr[methodname_idx];
+				
 				GET_INSTRUCTION_ARG(base, argc);
 				Variant **argptrs = instruction_args;
+
+				static constexpr unsigned int JIT_CALL_THRESHHOLD = 1000;
+				static constexpr unsigned int JIT_EXCLUDE = 0;
+
+				unsigned int &call_count = _global_name_invocations_ptr[methodname_idx];
+
+				// increment unless call_count == JIT_EXCLUDE
+				call_count = (call_count != JIT_EXCLUDE) * (call_count + 1);
+
+				if (unlikely(call_count >= JIT_CALL_THRESHHOLD)) {
+					// only optimize if it's a valid call to a gdscript function
+					bool is_valid_gdscript_call = (base->get_type() == Variant::Type::OBJECT) &
+							//methodname != SceneStringName(_ready) &
+							methodname != CoreStringName(free_) &
+							methodname != SNAME("new");
+					if (is_valid_gdscript_call) {
+						// lookup method
+						//printf("optimizing %s ", methodname._data->get_name().ascii());
+						GDScript *gdscript = _script;
+
+						GDScriptFunction *called_fn = nullptr;
+						while (gdscript) {
+							if (likely(gdscript->valid)) {
+								auto E = gdscript->member_functions.find(methodname);
+								if (E) {
+									called_fn = E->value;
+									break;
+								}
+							}
+							gdscript = gdscript->_base;
+						}
+					
+						// if (called_fn) {
+						// 	called_fn->_argument_count
+						// }
+					}
+
+					// exclude the method from further inspection
+					call_count = JIT_EXCLUDE;
+				}
 
 #ifdef DEBUG_ENABLED
 				uint64_t call_time = 0;
@@ -1747,7 +1885,7 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 				Callable::CallError err;
 				if (call_ret) {
 					GET_INSTRUCTION_ARG(ret, argc + 1);
-					base->callp(*methodname, (const Variant **)argptrs, argc, *ret, err);
+					base->callp(methodname, (const Variant **)argptrs, argc, *ret, err);
 #ifdef DEBUG_ENABLED
 					if (ret->get_type() == Variant::NIL) {
 						if (base_type == Variant::OBJECT) {
@@ -1777,7 +1915,7 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 #endif
 				} else {
 					Variant ret;
-					base->callp(*methodname, (const Variant **)argptrs, argc, ret, err);
+					base->callp(methodname, (const Variant **)argptrs, argc, ret, err);
 				}
 #ifdef DEBUG_ENABLED
 
@@ -3589,6 +3727,11 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 				CHECK_SPACE(2);
 
 				line = _code_ptr[ip + 1];
+
+				// if (stack_cache && line == 82) {
+				// 	printf("L%i ", line);
+				// 	printf("fn%s\n", get_name()._data->get_name().ascii().get_data());
+				// }
 				ip += 2;
 
 				if (EngineDebugger::is_active()) {
@@ -3623,6 +3766,73 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 #endif
 				OPCODE_BREAK;
 			}
+            /*
+
+            OPCODE1(OPCODE_PRIMITIVE_UNARY_OP) {
+                Variant *val = GET_VARIANT(opcode.val);
+
+                switch (opcode.unary_op) {
+                    case Variant::Operator::OP_NEGATE:
+                        *val = -*reinterpret_cast<int64_t*>(val);
+                    case Variant::Operator::OP_NOT:
+                        *val = !*reinterpret_cast<int64_t*>(val);
+                    case Variant::Operator::OP_BIT_NEGATE:
+                        *val = ~*reinterpret_cast<int64_t*>(val);
+                }
+
+                OPCODE_BREAK;
+            }}
+
+            OPCODE1(OPCODE_PRIMITIVE_INT_BINARY_OP) {
+                int64_t lhs = *reinterpret_cast<int64_t*>(GET_VARIANT(opcode.lhs));
+                int64_t rhs = *reinterpret_cast<int64_t*>(GET_VARIANT(opcode.rhs));
+                Variant *dst = GET_VARIANT(opcode.dst);
+
+                switch (opcode.binary_op) {
+                    case Variant::Operator::OP_ADD:
+                        *dst = lhs + rhs;
+                    case Variant::Operator::OP_SUBTRACT:
+                        *dst = lhs - rhs;
+                    case Variant::Operator::OP_MULTIPLY:
+                        *dst = lhs * rhs;
+                    case Variant::Operator::OP_DIVIDE:
+                        *dst = lhs / rhs;
+                    case Variant::Operator::OP_MODULE:
+                        *dst = lhs % rhs;
+                    case Variant::Operator::OP_POWER:
+                        *dst = std::pow(lhs, rhs);
+                    case Variant::Operator::OP_SHIFT_LEFT:
+                        *dst = lhs << rhs;
+                    case Variant::Operator::OP_SHIFT_RIGHT:
+                        *dst = lhs >> rhs;
+                    case Variant::Operator::OP_BIT_AND:
+                        *dst = lhs & rhs;
+                    case Variant::Operator::OP_BIT_OR:
+                        *dst = lhs | rhs;
+                    case Variant::Operator::OP_BIT_XOR:
+                        *dst = lhs ^ rhs;
+                    case Variant::Operator::OP_EQUAL:
+                        *dst = lhs == rhs;
+                    case Variant::Operator::OP_NOT_EQUAL:
+                        *dst = lhs != rhs;
+                    case Variant::Operator::OP_LESS:
+                        *dst = lhs < rhs;
+                    case Variant::Operator::OP_LESS_EQUAL:
+                        *dst = lhs <= rhs;
+                    case Variant::Operator::OP_GREATER:
+                        *dst = lhs > rhs;
+                    case Variant::Operator::OP_GREATER_EQUAL:
+                        *dst = lhs >= rhs;
+                    case Variant::Operator::OP_AND:
+                        *dst = (lhs & rhs) != 0;
+                    case Variant::Operator::OP_OR:
+                        *dst = (lhs | rhs) != 0;
+                    case Variant::Operator::OP_XOR:
+                        *dst = (lhs != 0) ^ (rhs != 0);
+                }
+
+                OPCODE_BREAK;
+            }}*/
 
 #if 0 // Enable for debugging.
 			default: {

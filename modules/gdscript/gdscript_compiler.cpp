@@ -1892,6 +1892,8 @@ Error GDScriptCompiler::_parse_block(CodeGen &codegen, const GDScriptParser::Sui
 	for (int i = 0; i < p_block->statements.size(); i++) {
 		const GDScriptParser::Node *s = p_block->statements[i];
 
+	//printf("\nL%i\n", s->start_line);
+
 #ifdef DEBUG_ENABLED
 		// Add a newline before each statement, since the debugger needs those.
 		gen->write_newline(s->start_line);
