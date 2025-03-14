@@ -30,24 +30,12 @@
 
 #include "register_types.h"
 
-#include "image_loader_jpegd.h"
+#include "asm.h"
 
-static Ref<ImageLoaderJPG> image_loader_jpg;
+void initialize_jit_codegen_module(ModuleInitializationLevel p_level) {
 
-void initialize_jpg_module(ModuleInitializationLevel p_level) {
-	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
-		return;
-	}
-
-	image_loader_jpg.instantiate();
-	ImageLoader::add_image_format_loader(image_loader_jpg);
 }
 
-void uninitialize_jpg_module(ModuleInitializationLevel p_level) {
-	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
-		return;
-	}
+void uninitialize_jit_codegen_module(ModuleInitializationLevel p_level) {
 
-	ImageLoader::remove_image_format_loader(image_loader_jpg);
-	image_loader_jpg.unref();
 }

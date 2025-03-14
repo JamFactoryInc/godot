@@ -82,6 +82,8 @@ if sys.stdout.isatty() and sys.platform == "win32":
         methods._colorize = False
         print_error(f"Failed to enable ANSI escape code support, disabling color output.\n{e}")
 
+# scons use_mingw=yes
+
 # Scan possible build platforms
 
 platform_list = []  # list of platforms
@@ -469,9 +471,11 @@ env.editor_build = env["target"] == "editor"
 env.dev_build = env["dev_build"]
 env.debug_features = env["target"] in ["editor", "template_debug"]
 
-#env.editor_build = False
-#env.dev_build = False
-#env.debug_features = False
+# scons use_mingw=yes tests=yes lto=none
+
+env.editor_build = False
+env.dev_build = False
+env.debug_features = False
 
 if env["optimize"] == "auto":
     if env.dev_build:

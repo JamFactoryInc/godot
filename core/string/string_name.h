@@ -51,6 +51,7 @@ class StringName {
 		STRING_TABLE_MASK = STRING_TABLE_LEN - 1
 	};
 
+public:
 	struct _Data {
 		SafeRefCount refcount;
 		SafeNumeric<uint32_t> static_count;
@@ -91,7 +92,7 @@ class StringName {
 
 	StringName(_Data *p_data) { _data = p_data; }
 
-public:
+
 	operator const void *() const { return (_data && (_data->cname || !_data->name.is_empty())) ? (void *)1 : nullptr; }
 
 	bool operator==(const String &p_name) const;

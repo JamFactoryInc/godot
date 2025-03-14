@@ -27,7 +27,7 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 
-static SLJIT_INLINE void* alloc_chunk(sljit_uw size)
+static SLJIT2_INLINE void* alloc_chunk(sljit2_uw size)
 {
 	void *retval;
 	int prot = PROT_READ | PROT_WRITE | PROT_EXEC;
@@ -41,7 +41,7 @@ static SLJIT_INLINE void* alloc_chunk(sljit_uw size)
 #ifdef MAP_ANON
 	flags |= MAP_ANON;
 #else /* !MAP_ANON */
-	if (SLJIT_UNLIKELY((dev_zero < 0) && open_dev_zero()))
+	if (SLJIT2_UNLIKELY((dev_zero < 0) && open_dev_zero()))
 		return NULL;
 
 	fd = dev_zero;
@@ -54,7 +54,7 @@ static SLJIT_INLINE void* alloc_chunk(sljit_uw size)
 	return retval;
 }
 
-static SLJIT_INLINE void free_chunk(void *chunk, sljit_uw size)
+static SLJIT2_INLINE void free_chunk(void *chunk, sljit2_uw size)
 {
 	munmap(chunk, size);
 }

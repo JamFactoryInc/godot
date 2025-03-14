@@ -216,9 +216,17 @@ GDScriptFunction *GDScriptByteCodeGenerator::write_end() {
 		}
 		function->_global_names_count = function->global_names.size();
 
+		function->global_name_invocations.resize(function->global_names.size());
+		for (int i = 0; i < function->global_name_invocations.size(); i++) {
+			function->global_name_invocations.write[i] = 1;
+		}
+		function->_global_name_invocations_ptr = function->global_name_invocations.ptrw();
+
 	} else {
 		function->_global_names_ptr = nullptr;
 		function->_global_names_count = 0;
+
+		function->_global_name_invocations_ptr = nullptr;
 	}
 
 	if (opcodes.size()) {
@@ -318,7 +326,6 @@ GDScriptFunction *GDScriptByteCodeGenerator::write_end() {
 		for (const KeyValue<Variant::ValidatedIndexedGetter, int> &E : indexed_getters_map) {
 			function->indexed_getters.write[E.value] = E.key;
 		}
-		fn_ptrs_offset += indexed_getters_map.size();
 	} else {
 		function->_indexed_getters_count = 0;
 		function->_indexed_getters_ptr = nullptr;
@@ -1692,10 +1699,8 @@ void GDScriptByteCodeGenerator::write_breakpoint() {
 	append_opcode(GDScriptFunction::OPCODE_BREAKPOINT);
 }
 
-//#define COMPILE_LINE_OPCODES
-
 void GDScriptByteCodeGenerator::write_newline(int p_line) {
-#ifdef COMPILE_LINE_OPCODES
+#ifdef DEBUG_ENABLED
 	append_opcode(GDScriptFunction::OPCODE_LINE);
 	append(p_line);
 	current_line = p_line;

@@ -213,7 +213,7 @@ public:
 	~GDScriptDataType() {}
 };
 
-class GDScriptFunction {
+class alignas(64) GDScriptFunction {
 public:
 	enum Opcode {
 		OPCODE_OPERATOR,
@@ -367,6 +367,11 @@ public:
 		OPCODE_ASSERT,
 		OPCODE_BREAKPOINT,
 		OPCODE_LINE,
+//        OPCODE_ASSIGN_FROM_PRIMITIVE,
+//        OPCODE_ASSIGN_TO_PRIMITIVE,
+//        OPCODE_ASSIGN_FROM_TO_PRIMITIVE,
+//        OPCODE_PRIMITIVE_UNARY_OP,
+//        OPCODE_PRIMITIVE_INT_BINARY_OP,
 		OPCODE_END
 	};
 
@@ -402,43 +407,93 @@ private:
 	friend class GDScriptCompiler;
 	friend class GDScriptByteCodeGenerator;
 	friend class GDScriptLanguage;
+	friend class DynOpcode;
+	friend class CodeCrawler;
+
+	unsigned int *_global_name_invocations_ptr;
+	Vector<unsigned int> global_name_invocations;
+	uint64_t _3_3 = 0;
+	uint64_t _3_4 = 0;
+	uint64_t _3_5 = 0;
+	uint64_t _3_6 = 0;
+	uint64_t _3_7 = 0;
+
+	HashMap<int, Variant::Type> temporary_slots;
+	Vector<GDScriptDataType> argument_types;
+	GDScript *_script = nullptr;
+	unsigned short _initial_line = 0;
+	unsigned short _stack_size = 0;
+	unsigned short _argument_count = 0;
+	unsigned short _instruction_args_size = 0;
+
+	//uint64_t _4_1 = 0;
+	Vector<GDScriptFunction *> lambdas;
+	GDScriptFunction **_lambdas_ptr = nullptr;
+	mutable Variant nil;
+	Variant rpc_config;
+	
+	int *_code_ptr = nullptr;
+	mutable Variant *_constants_ptr = nullptr;
+	const Variant::ValidatedSetter *_setters_ptr = nullptr;
+	const StringName *_global_names_ptr = nullptr;
+	const Variant::ValidatedKeyedSetter *_keyed_setters_ptr = nullptr;
+	MethodBind **_methods_ptr = nullptr;
+	const Variant::ValidatedKeyedGetter * _keyed_getters_ptr = nullptr;
+	const Variant::ValidatedOperatorEvaluator * _operator_funcs_ptr = nullptr;
+
+	const int *_default_arg_ptr = nullptr;
+	const Variant::ValidatedBuiltInMethod * _builtin_methods_ptr = nullptr;
+	const Variant::ValidatedGetter * _getters_ptr = nullptr;
+	const Variant::ValidatedConstructor *_constructors_ptr = nullptr;
+	const Variant::ValidatedUtilityFunction * _utilities_ptr = nullptr;
+	const Variant::ValidatedIndexedSetter * _indexed_setters_ptr = nullptr;
+	const GDScriptUtilityFunctions::FunctionPtr * _gds_utilities_ptr = nullptr;
+	const Variant::ValidatedIndexedGetter * _indexed_getters_ptr = nullptr;
+
+	Vector<int> default_arguments;
+	Vector<int> code;
+	Vector<Variant> constants;
+	Vector<StringName> global_names;
+	Vector<Variant::ValidatedKeyedSetter> keyed_setters;
+	Vector<MethodBind *> methods;
+	Vector<Variant::ValidatedKeyedGetter> keyed_getters;
+	Vector<Variant::ValidatedOperatorEvaluator> operator_funcs;
+
+	Vector<Variant::ValidatedBuiltInMethod> builtin_methods;
+	Vector<Variant::ValidatedGetter> getters;
+	Vector<Variant::ValidatedConstructor> constructors;
+	Vector<Variant::ValidatedSetter> setters;
+	Vector<Variant::ValidatedUtilityFunction> utilities;
+	Vector<Variant::ValidatedIndexedSetter> indexed_setters;
+	Vector<GDScriptUtilityFunctions::FunctionPtr> gds_utilities;
+	Vector<Variant::ValidatedIndexedGetter> indexed_getters;
+
+	// no spacers: 72-73
+	
+
+	//uint64_t _1_2 = 0; // _1_2 terrible
+	// uint64_t _1_3 = 0; // _1_2 -_1_3 terrible
+	// uint64_t _1_4 = 0; // _1_2 -_1_4 ~75
+	// uint64_t _1_5 = 0; // _1_2 -_1_5 ~75
+	// uint64_t _1_6 = 0; // _1_2 -_1_6 ~75
+	// uint64_t _1_7 = 0; // _1_2 -_1_7 terrible again
+	// uint64_t _1_8 = 0; // _1_2 -_1_8
 
 	StringName name;
 	StringName source;
 	bool _static = false;
-	Vector<GDScriptDataType> argument_types;
 	GDScriptDataType return_type;
 	MethodInfo method_info;
-	Variant rpc_config;
+	
 
-	GDScript *_script = nullptr;
-	int _initial_line = 0;
-	int _argument_count = 0;
-	int _stack_size = 0;
-	int _instruction_args_size = 0;
+	// // just _2_1 & _2_3 & _2_4 & _2_5 -> ~75
+	uint64_t _7_1 = 0;
+	uint64_t _7_2 = 0;
+	uint64_t _7_3 = 0; // just _1_2 & _1_3 & _2_3 & _2_4 -> ~75
+	// uint64_t _2_4 = 0;
 
 	SelfList<GDScriptFunction> function_list{ this };
-	mutable Variant nil;
-	HashMap<int, Variant::Type> temporary_slots;
 	List<StackDebug> stack_debug;
-
-	Vector<int> code;
-	Vector<int> default_arguments;
-	Vector<Variant> constants;
-	Vector<StringName> global_names;
-	Vector<Variant::ValidatedOperatorEvaluator> operator_funcs;
-	Vector<Variant::ValidatedSetter> setters;
-	Vector<Variant::ValidatedGetter> getters;
-	Vector<Variant::ValidatedKeyedSetter> keyed_setters;
-	Vector<Variant::ValidatedKeyedGetter> keyed_getters;
-	Vector<Variant::ValidatedIndexedSetter> indexed_setters;
-	Vector<Variant::ValidatedIndexedGetter> indexed_getters;
-	Vector<Variant::ValidatedBuiltInMethod> builtin_methods;
-	Vector<Variant::ValidatedConstructor> constructors;
-	Vector<Variant::ValidatedUtilityFunction> utilities;
-	Vector<GDScriptUtilityFunctions::FunctionPtr> gds_utilities;
-	Vector<MethodBind *> methods;
-	Vector<GDScriptFunction *> lambdas;
 
 	int _code_size = 0;
 	int _default_arg_count = 0;
@@ -458,23 +513,15 @@ private:
 	int _methods_count = 0;
 	int _lambdas_count = 0;
 
-	int *_code_ptr = nullptr;
-	const int *_default_arg_ptr = nullptr;
-	mutable Variant *_constants_ptr = nullptr;
-	const StringName *_global_names_ptr = nullptr;
-	const Variant::ValidatedOperatorEvaluator *_operator_funcs_ptr = nullptr;
-	const Variant::ValidatedSetter *_setters_ptr = nullptr;
-	const Variant::ValidatedGetter *_getters_ptr = nullptr;
-	const Variant::ValidatedKeyedSetter *_keyed_setters_ptr = nullptr;
-	const Variant::ValidatedKeyedGetter *_keyed_getters_ptr = nullptr;
-	const Variant::ValidatedIndexedSetter *_indexed_setters_ptr = nullptr;
-	const Variant::ValidatedIndexedGetter *_indexed_getters_ptr = nullptr;
-	const Variant::ValidatedBuiltInMethod *_builtin_methods_ptr = nullptr;
-	const Variant::ValidatedConstructor *_constructors_ptr = nullptr;
-	const Variant::ValidatedUtilityFunction *_utilities_ptr = nullptr;
-	const GDScriptUtilityFunctions::FunctionPtr *_gds_utilities_ptr = nullptr;
-	MethodBind **_methods_ptr = nullptr;
-	GDScriptFunction **_lambdas_ptr = nullptr;
+	uint64_t _2_1 = 0;
+	uint64_t _2_2 = 0;
+	uint64_t _2_3 = 0;
+
+	uint64_t _5_1 = 0;
+	// uint64_t _5_2 = 0;
+	// uint64_t _5_3 = 0;
+	// uint64_t _5_4 = 0;
+
 
 #ifdef DEBUG_ENABLED
 	CharString func_cname;
@@ -508,6 +555,8 @@ private:
 		HashMap<String, NativeProfile> last_native_calls;
 	} profile;
 #endif
+
+	void _on_stack_replace(GDScriptFunction &fn, Variant *&old_stack);
 
 	_FORCE_INLINE_ String _get_call_error(const Callable::CallError &p_err, const String &p_where, const Variant **argptrs) const;
 	Variant _get_default_variant_for_data_type(const GDScriptDataType &p_data_type);

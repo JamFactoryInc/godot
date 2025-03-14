@@ -1892,6 +1892,8 @@ Error GDScriptCompiler::_parse_block(CodeGen &codegen, const GDScriptParser::Sui
 	for (int i = 0; i < p_block->statements.size(); i++) {
 		const GDScriptParser::Node *s = p_block->statements[i];
 
+	//printf("\nL%i\n", s->start_line);
+
 #ifdef DEBUG_ENABLED
 		// Add a newline before each statement, since the debugger needs those.
 		gen->write_newline(s->start_line);
@@ -2473,15 +2475,6 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 
 	return gd_function;
 }
-
-//void *GDScriptCompiler::optimize_function(GDScriptFunction &fn) {
-//	int *code = fn._code_ptr;
-//	int line = 0;
-//	GDScriptFunction::Opcode op;
-//	while (op != GDScriptFunction::Opcode::OPCODE_END) {
-//
-//	}
-//}
 
 GDScriptFunction *GDScriptCompiler::_make_static_initializer(Error &r_error, GDScript *p_script, const GDScriptParser::ClassNode *p_class) {
 	r_error = OK;

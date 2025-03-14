@@ -36,16 +36,16 @@
 
 #if (defined(TARGET_OS_OSX) && TARGET_OS_OSX) || (TARGET_OS_MAC && !TARGET_OS_IPHONE)
 
-#if defined(SLJIT_CONFIG_X86) && SLJIT_CONFIG_X86
+#if defined(SLJIT2_CONFIG_X86) && SLJIT2_CONFIG_X86
 
 #include <sys/utsname.h>
 #include <stdlib.h>
 
-#define SLJIT_UPDATE_WX_FLAGS(from, to, enable_exec)
+#define SLJIT2_UPDATE_WX_FLAGS(from, to, enable_exec)
 
 #ifdef MAP_JIT
-#define SLJIT_MAP_JIT	(get_map_jit_flag())
-static SLJIT_INLINE int get_map_jit_flag(void)
+#define SLJIT2_MAP_JIT	(get_map_jit_flag())
+static SLJIT2_INLINE int get_map_jit_flag(void)
 {
 	size_t page_size;
 	void *ptr;
@@ -72,19 +72,19 @@ static SLJIT_INLINE int get_map_jit_flag(void)
 	return map_jit_flag;
 }
 #else /* !defined(MAP_JIT) */
-#define SLJIT_MAP_JIT	(0)
+#define SLJIT2_MAP_JIT	(0)
 #endif
 
-#elif defined(SLJIT_CONFIG_ARM) && SLJIT_CONFIG_ARM
+#elif defined(SLJIT2_CONFIG_ARM) && SLJIT2_CONFIG_ARM
 
 #include <AvailabilityMacros.h>
 #include <pthread.h>
 
-#define SLJIT_MAP_JIT	(MAP_JIT)
-#define SLJIT_UPDATE_WX_FLAGS(from, to, enable_exec) \
+#define SLJIT2_MAP_JIT	(MAP_JIT)
+#define SLJIT2_UPDATE_WX_FLAGS(from, to, enable_exec) \
 		apple_update_wx_flags(enable_exec)
 
-static SLJIT_INLINE void apple_update_wx_flags(sljit_s32 enable_exec)
+static SLJIT2_INLINE void apple_update_wx_flags(sljit2_s32 enable_exec)
 {
 #if MAC_OS_X_VERSION_MIN_REQUIRED < 110000
 	if (__builtin_available(macos 11, *))
@@ -92,44 +92,44 @@ static SLJIT_INLINE void apple_update_wx_flags(sljit_s32 enable_exec)
 	pthread_jit_write_protect_np(enable_exec);
 }
 
-#elif defined(SLJIT_CONFIG_PPC) && SLJIT_CONFIG_PPC
+#elif defined(SLJIT2_CONFIG_PPC) && SLJIT2_CONFIG_PPC
 
-#define SLJIT_MAP_JIT	(0)
-#define SLJIT_UPDATE_WX_FLAGS(from, to, enable_exec)
+#define SLJIT2_MAP_JIT	(0)
+#define SLJIT2_UPDATE_WX_FLAGS(from, to, enable_exec)
 
 #else
 #error "Unsupported architecture"
-#endif /* SLJIT_CONFIG */
+#endif /* SLJIT2_CONFIG */
 
 #else /* !TARGET_OS_OSX */
 
 #ifdef MAP_JIT
-#define SLJIT_MAP_JIT	(MAP_JIT)
+#define SLJIT2_MAP_JIT	(MAP_JIT)
 #else
-#define SLJIT_MAP_JIT	(0)
+#define SLJIT2_MAP_JIT	(0)
 #endif
 
 #endif /* TARGET_OS_OSX */
 
-static SLJIT_INLINE void* alloc_chunk(sljit_uw size)
+static SLJIT2_INLINE void* alloc_chunk(sljit2_uw size)
 {
 	void *retval;
 	int prot = PROT_READ | PROT_WRITE | PROT_EXEC;
 	int flags = MAP_PRIVATE;
 	int fd = -1;
 
-	flags |= MAP_ANON | SLJIT_MAP_JIT;
+	flags |= MAP_ANON | SLJIT2_MAP_JIT;
 
 	retval = mmap(NULL, size, prot, flags, fd, 0);
 	if (retval == MAP_FAILED)
 		return NULL;
 
-	SLJIT_UPDATE_WX_FLAGS(retval, (uint8_t *)retval + size, 0);
+	SLJIT2_UPDATE_WX_FLAGS(retval, (uint8_t *)retval + size, 0);
 
 	return retval;
 }
 
-static SLJIT_INLINE void free_chunk(void *chunk, sljit_uw size)
+static SLJIT2_INLINE void free_chunk(void *chunk, sljit2_uw size)
 {
 	munmap(chunk, size);
 }

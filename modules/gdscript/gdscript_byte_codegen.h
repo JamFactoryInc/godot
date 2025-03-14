@@ -378,7 +378,7 @@ class GDScriptByteCodeGenerator : public GDScriptCodeGenerator {
 		return -1; // Unreachable.
 	}
 
-	char* opcode_name(GDScriptFunction::Opcode p_code) {
+	char const* opcode_name(GDScriptFunction::Opcode p_code) {
 		switch (p_code) {
 			case GDScriptFunction::OPCODE_OPERATOR:
 				return "op";
@@ -696,7 +696,7 @@ class GDScriptByteCodeGenerator : public GDScriptCodeGenerator {
 		} else {
 			std::printf("\n\t%-15s", opcode_name(p_code));
 		}
-		
+
 		opcodes.push_back(p_code);
 	}
 
@@ -718,7 +718,7 @@ class GDScriptByteCodeGenerator : public GDScriptCodeGenerator {
 	}
 
 	void append(const StringName &p_name) {
-		std::printf(" str %-8s", (p_name.operator String()).ptr());
+		std::printf(" str %-8s", p_name._data->get_name().ascii().get_data());
 		opcodes.push_back(get_name_map_pos(p_name));
 	}
 

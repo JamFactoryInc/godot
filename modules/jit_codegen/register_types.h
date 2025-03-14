@@ -28,12 +28,12 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#ifndef JPG_REGISTER_TYPES_H
-#define JPG_REGISTER_TYPES_H
+#ifndef JIT_CODEGEN_REGISTER_TYPES_H
+#define JIT_CODEGEN_REGISTER_TYPES_H
 
 #include "modules/register_module_types.h"
 
-void initialize_jpg_module(ModuleInitializationLevel p_level);
-void uninitialize_jpg_module(ModuleInitializationLevel p_level);
+void initialize_jit_codegen_module(ModuleInitializationLevel p_level);
+void uninitialize_jit_codegen_module(ModuleInitializationLevel p_level);
 
-#endif // JPG_REGISTER_TYPES_H
+#endif // JIT_CODEGEN_REGISTER_TYPES_H

@@ -24,8 +24,8 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef SLJIT_LIR_H_
-#define SLJIT_LIR_H_
+#ifndef SLJIT2_LIR_H_
+#define SLJIT2_LIR_H_
 
 /*
    ------------------------------------------------------------------------
@@ -37,10 +37,10 @@
       - The execution can be continued from any LIR instruction. In other
         words, it is possible to jump to any label from anywhere, even from
         a code fragment, which is compiled later, as long as the compiling
-        context is the same. See sljit_emit_enter for more details.
+        context is the same. See sljit2_emit_enter for more details.
       - Supports self modifying code: target of any jump and call
         instructions and some constant values can be dynamically modified
-        during runtime. See SLJIT_REWRITABLE_JUMP.
+        during runtime. See SLJIT2_REWRITABLE_JUMP.
         - although it is not suggested to do it frequently
         - can be used for inline caching: save an important value once
           in the instruction stream
@@ -68,9 +68,9 @@
       - pass --smc-check=all argument to valgrind, since JIT is a "self-modifying code"
 */
 
-#if (defined SLJIT_HAVE_CONFIG_PRE && SLJIT_HAVE_CONFIG_PRE)
+#if (defined SLJIT2_HAVE_CONFIG_PRE && SLJIT2_HAVE_CONFIG_PRE)
 #include "sljitConfigPre.h"
-#endif /* SLJIT_HAVE_CONFIG_PRE */
+#endif /* SLJIT2_HAVE_CONFIG_PRE */
 
 #include "sljitConfigCPU.h"
 #include "sljitConfig.h"
@@ -81,37 +81,37 @@ of sljitConfigInternal.h */
 
 #include "sljitConfigInternal.h"
 
-#if (defined SLJIT_HAVE_CONFIG_POST && SLJIT_HAVE_CONFIG_POST)
+#if (defined SLJIT2_HAVE_CONFIG_POST && SLJIT2_HAVE_CONFIG_POST)
 #include "sljitConfigPost.h"
-#endif /* SLJIT_HAVE_CONFIG_POST */
+#endif /* SLJIT2_HAVE_CONFIG_POST */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* Version numbers. */
-#define SLJIT_MAJOR_VERSION	0
-#define SLJIT_MINOR_VERSION	95
+#define SLJIT2_MAJOR_VERSION	0
+#define SLJIT2_MINOR_VERSION	95
 
 /* --------------------------------------------------------------------- */
 /*  Error codes                                                          */
 /* --------------------------------------------------------------------- */
 
 /* Indicates no error. */
-#define SLJIT_SUCCESS			0
-/* After the call of sljit_generate_code(), the error code of the compiler
+#define SLJIT2_SUCCESS			0
+/* After the call of sljit2_generate_code(), the error code of the compiler
    is set to this value to avoid further code generation.
-   The complier should be freed after sljit_generate_code(). */
-#define SLJIT_ERR_COMPILED		1
+   The complier should be freed after sljit2_generate_code(). */
+#define SLJIT2_ERR_COMPILED		1
 /* Cannot allocate non-executable memory. */
-#define SLJIT_ERR_ALLOC_FAILED		2
+#define SLJIT2_ERR_ALLOC_FAILED		2
 /* Cannot allocate executable memory.
-   Only sljit_generate_code() returns with this error code. */
-#define SLJIT_ERR_EX_ALLOC_FAILED	3
+   Only sljit2_generate_code() returns with this error code. */
+#define SLJIT2_ERR_EX_ALLOC_FAILED	3
 /* Unsupported instruction form. */
-#define SLJIT_ERR_UNSUPPORTED		4
+#define SLJIT2_ERR_UNSUPPORTED		4
 /* An invalid argument is passed to any SLJIT function. */
-#define SLJIT_ERR_BAD_ARGUMENT		5
+#define SLJIT2_ERR_BAD_ARGUMENT		5
 
 /* --------------------------------------------------------------------- */
 /*  Registers                                                            */
@@ -137,11 +137,11 @@ extern "C" {
     D |  [R3]  |  S1  |  R3 and S1 represent the same physical register D
     E |  [R4]  |  S0  |  R4 and S0 represent the same physical register E
 
-  Note: SLJIT_NUMBER_OF_SCRATCH_REGISTERS will be 2 and
-        SLJIT_NUMBER_OF_SAVED_REGISTERS will be 3.
+  Note: SLJIT2_NUMBER_OF_SCRATCH_REGISTERS will be 2 and
+        SLJIT2_NUMBER_OF_SAVED_REGISTERS will be 3.
 
-  Note: For all supported architectures SLJIT_NUMBER_OF_REGISTERS >= 12
-        and SLJIT_NUMBER_OF_SAVED_REGISTERS >= 6. However, 6 registers
+  Note: For all supported architectures SLJIT2_NUMBER_OF_REGISTERS >= 12
+        and SLJIT2_NUMBER_OF_SAVED_REGISTERS >= 6. However, 6 registers
         are virtual on x86-32. See below.
 
   The purpose of this definition is convenience: saved registers can
@@ -156,66 +156,66 @@ extern "C" {
   Note: To emphasize that registers assigned to R2-R4 are saved
         registers, they are enclosed by square brackets.
 
-  Note: sljit_emit_enter and sljit_set_context define whether a register
+  Note: sljit2_emit_enter and sljit2_set_context define whether a register
         is S or R register. E.g: if in the previous example 3 scratches and
-        1 saved are mapped by sljit_emit_enter, the allowed register set
+        1 saved are mapped by sljit2_emit_enter, the allowed register set
         will be: R0-R2 and S0. Although S2 is mapped to the same register
         than R2, it is not available in that configuration. Furthermore
         the S1 register cannot be used at all.
 */
 
 /* Scratch registers. */
-#define SLJIT_R0	1
-#define SLJIT_R1	2
-#define SLJIT_R2	3
+#define SLJIT2_R0	1
+#define SLJIT2_R1	2
+#define SLJIT2_R2	3
 /* Note: on x86-32, R3 - R6 (same as S3 - S6) are emulated (they
    are allocated on the stack). These registers are called virtual
    and cannot be used for memory addressing (cannot be part of
-   any SLJIT_MEM1, SLJIT_MEM2 construct). There is no such
-   limitation on other CPUs. See sljit_get_register_index(). */
-#define SLJIT_R3	4
-#define SLJIT_R4	5
-#define SLJIT_R5	6
-#define SLJIT_R6	7
-#define SLJIT_R7	8
-#define SLJIT_R8	9
-#define SLJIT_R9	10
-/* All R registers provided by the architecture can be accessed by SLJIT_R(i)
-   The i parameter must be >= 0 and < SLJIT_NUMBER_OF_REGISTERS. */
-#define SLJIT_R(i)	(1 + (i))
+   any SLJIT2_MEM1, SLJIT2_MEM2 construct). There is no such
+   limitation on other CPUs. See sljit2_get_register_index(). */
+#define SLJIT2_R3	4
+#define SLJIT2_R4	5
+#define SLJIT2_R5	6
+#define SLJIT2_R6	7
+#define SLJIT2_R7	8
+#define SLJIT2_R8	9
+#define SLJIT2_R9	10
+/* All R registers provided by the architecture can be accessed by SLJIT2_R(i)
+   The i parameter must be >= 0 and < SLJIT2_NUMBER_OF_REGISTERS. */
+#define SLJIT2_R(i)	(1 + (i))
 
 /* Saved registers. */
-#define SLJIT_S0	(SLJIT_NUMBER_OF_REGISTERS)
-#define SLJIT_S1	(SLJIT_NUMBER_OF_REGISTERS - 1)
-#define SLJIT_S2	(SLJIT_NUMBER_OF_REGISTERS - 2)
+#define SLJIT2_S0	(SLJIT2_NUMBER_OF_REGISTERS)
+#define SLJIT2_S1	(SLJIT2_NUMBER_OF_REGISTERS - 1)
+#define SLJIT2_S2	(SLJIT2_NUMBER_OF_REGISTERS - 2)
 /* Note: on x86-32, S3 - S6 (same as R3 - R6) are emulated (they
    are allocated on the stack). These registers are called virtual
    and cannot be used for memory addressing (cannot be part of
-   any SLJIT_MEM1, SLJIT_MEM2 construct). There is no such
-   limitation on other CPUs. See sljit_get_register_index(). */
-#define SLJIT_S3	(SLJIT_NUMBER_OF_REGISTERS - 3)
-#define SLJIT_S4	(SLJIT_NUMBER_OF_REGISTERS - 4)
-#define SLJIT_S5	(SLJIT_NUMBER_OF_REGISTERS - 5)
-#define SLJIT_S6	(SLJIT_NUMBER_OF_REGISTERS - 6)
-#define SLJIT_S7	(SLJIT_NUMBER_OF_REGISTERS - 7)
-#define SLJIT_S8	(SLJIT_NUMBER_OF_REGISTERS - 8)
-#define SLJIT_S9	(SLJIT_NUMBER_OF_REGISTERS - 9)
-/* All S registers provided by the architecture can be accessed by SLJIT_S(i)
-   The i parameter must be >= 0 and < SLJIT_NUMBER_OF_SAVED_REGISTERS. */
-#define SLJIT_S(i)	(SLJIT_NUMBER_OF_REGISTERS - (i))
+   any SLJIT2_MEM1, SLJIT2_MEM2 construct). There is no such
+   limitation on other CPUs. See sljit2_get_register_index(). */
+#define SLJIT2_S3	(SLJIT2_NUMBER_OF_REGISTERS - 3)
+#define SLJIT2_S4	(SLJIT2_NUMBER_OF_REGISTERS - 4)
+#define SLJIT2_S5	(SLJIT2_NUMBER_OF_REGISTERS - 5)
+#define SLJIT2_S6	(SLJIT2_NUMBER_OF_REGISTERS - 6)
+#define SLJIT2_S7	(SLJIT2_NUMBER_OF_REGISTERS - 7)
+#define SLJIT2_S8	(SLJIT2_NUMBER_OF_REGISTERS - 8)
+#define SLJIT2_S9	(SLJIT2_NUMBER_OF_REGISTERS - 9)
+/* All S registers provided by the architecture can be accessed by SLJIT2_S(i)
+   The i parameter must be >= 0 and < SLJIT2_NUMBER_OF_SAVED_REGISTERS. */
+#define SLJIT2_S(i)	(SLJIT2_NUMBER_OF_REGISTERS - (i))
 
-/* Registers >= SLJIT_FIRST_SAVED_REG are saved registers. */
-#define SLJIT_FIRST_SAVED_REG (SLJIT_S0 - SLJIT_NUMBER_OF_SAVED_REGISTERS + 1)
+/* Registers >= SLJIT2_FIRST_SAVED_REG are saved registers. */
+#define SLJIT2_FIRST_SAVED_REG (SLJIT2_S0 - SLJIT2_NUMBER_OF_SAVED_REGISTERS + 1)
 
-/* The SLJIT_SP provides direct access to the linear stack space allocated by
-   sljit_emit_enter. It can only be used in the following form: SLJIT_MEM1(SLJIT_SP).
+/* The SLJIT2_SP provides direct access to the linear stack space allocated by
+   sljit2_emit_enter. It can only be used in the following form: SLJIT2_MEM1(SLJIT2_SP).
    The immediate offset is extended by the relative stack offset automatically.
-   sljit_get_local_base can be used to obtain the real address of a value. */
-#define SLJIT_SP	(SLJIT_NUMBER_OF_REGISTERS + 1)
+   sljit2_get_local_base can be used to obtain the real address of a value. */
+#define SLJIT2_SP	(SLJIT2_NUMBER_OF_REGISTERS + 1)
 
 /* Return with machine word. */
 
-#define SLJIT_RETURN_REG	SLJIT_R0
+#define SLJIT2_RETURN_REG	SLJIT2_R0
 
 /* --------------------------------------------------------------------- */
 /*  Floating point registers                                             */
@@ -226,41 +226,41 @@ extern "C" {
    and S register sets. See above. */
 
 /* Floating point scratch registers. */
-#define SLJIT_FR0	1
-#define SLJIT_FR1	2
-#define SLJIT_FR2	3
-#define SLJIT_FR3	4
-#define SLJIT_FR4	5
-#define SLJIT_FR5	6
-#define SLJIT_FR6	7
-#define SLJIT_FR7	8
-#define SLJIT_FR8	9
-#define SLJIT_FR9	10
-/* All FR registers provided by the architecture can be accessed by SLJIT_FR(i)
-   The i parameter must be >= 0 and < SLJIT_NUMBER_OF_FLOAT_REGISTERS. */
-#define SLJIT_FR(i)	(1 + (i))
+#define SLJIT2_FR0	1
+#define SLJIT2_FR1	2
+#define SLJIT2_FR2	3
+#define SLJIT2_FR3	4
+#define SLJIT2_FR4	5
+#define SLJIT2_FR5	6
+#define SLJIT2_FR6	7
+#define SLJIT2_FR7	8
+#define SLJIT2_FR8	9
+#define SLJIT2_FR9	10
+/* All FR registers provided by the architecture can be accessed by SLJIT2_FR(i)
+   The i parameter must be >= 0 and < SLJIT2_NUMBER_OF_FLOAT_REGISTERS. */
+#define SLJIT2_FR(i)	(1 + (i))
 
 /* Floating point saved registers. */
-#define SLJIT_FS0	(SLJIT_NUMBER_OF_FLOAT_REGISTERS)
-#define SLJIT_FS1	(SLJIT_NUMBER_OF_FLOAT_REGISTERS - 1)
-#define SLJIT_FS2	(SLJIT_NUMBER_OF_FLOAT_REGISTERS - 2)
-#define SLJIT_FS3	(SLJIT_NUMBER_OF_FLOAT_REGISTERS - 3)
-#define SLJIT_FS4	(SLJIT_NUMBER_OF_FLOAT_REGISTERS - 4)
-#define SLJIT_FS5	(SLJIT_NUMBER_OF_FLOAT_REGISTERS - 5)
-#define SLJIT_FS6	(SLJIT_NUMBER_OF_FLOAT_REGISTERS - 6)
-#define SLJIT_FS7	(SLJIT_NUMBER_OF_FLOAT_REGISTERS - 7)
-#define SLJIT_FS8	(SLJIT_NUMBER_OF_FLOAT_REGISTERS - 8)
-#define SLJIT_FS9	(SLJIT_NUMBER_OF_FLOAT_REGISTERS - 9)
-/* All FS registers provided by the architecture can be accessed by SLJIT_FS(i)
-   The i parameter must be >= 0 and < SLJIT_NUMBER_OF_SAVED_FLOAT_REGISTERS. */
-#define SLJIT_FS(i)	(SLJIT_NUMBER_OF_FLOAT_REGISTERS - (i))
+#define SLJIT2_FS0	(SLJIT2_NUMBER_OF_FLOAT_REGISTERS)
+#define SLJIT2_FS1	(SLJIT2_NUMBER_OF_FLOAT_REGISTERS - 1)
+#define SLJIT2_FS2	(SLJIT2_NUMBER_OF_FLOAT_REGISTERS - 2)
+#define SLJIT2_FS3	(SLJIT2_NUMBER_OF_FLOAT_REGISTERS - 3)
+#define SLJIT2_FS4	(SLJIT2_NUMBER_OF_FLOAT_REGISTERS - 4)
+#define SLJIT2_FS5	(SLJIT2_NUMBER_OF_FLOAT_REGISTERS - 5)
+#define SLJIT2_FS6	(SLJIT2_NUMBER_OF_FLOAT_REGISTERS - 6)
+#define SLJIT2_FS7	(SLJIT2_NUMBER_OF_FLOAT_REGISTERS - 7)
+#define SLJIT2_FS8	(SLJIT2_NUMBER_OF_FLOAT_REGISTERS - 8)
+#define SLJIT2_FS9	(SLJIT2_NUMBER_OF_FLOAT_REGISTERS - 9)
+/* All FS registers provided by the architecture can be accessed by SLJIT2_FS(i)
+   The i parameter must be >= 0 and < SLJIT2_NUMBER_OF_SAVED_FLOAT_REGISTERS. */
+#define SLJIT2_FS(i)	(SLJIT2_NUMBER_OF_FLOAT_REGISTERS - (i))
 
-/* Float registers >= SLJIT_FIRST_SAVED_FLOAT_REG are saved registers. */
-#define SLJIT_FIRST_SAVED_FLOAT_REG (SLJIT_FS0 - SLJIT_NUMBER_OF_SAVED_FLOAT_REGISTERS + 1)
+/* Float registers >= SLJIT2_FIRST_SAVED_FLOAT_REG are saved registers. */
+#define SLJIT2_FIRST_SAVED_FLOAT_REG (SLJIT2_FS0 - SLJIT2_NUMBER_OF_SAVED_FLOAT_REGISTERS + 1)
 
 /* Return with floating point arg. */
 
-#define SLJIT_RETURN_FREG	SLJIT_FR0
+#define SLJIT2_RETURN_FREG	SLJIT2_FR0
 
 /* --------------------------------------------------------------------- */
 /*  Vector registers                                                     */
@@ -271,189 +271,189 @@ extern "C" {
    in the same way as R and S register sets. See above.
 
    The storage space of vector registers often overlap with floating point
-   registers. In this case setting the value of SLJIT_VR(i) destroys the
-   value of SLJIT_FR(i) and vice versa. See SLJIT_SEPARATE_VECTOR_REGISTERS
+   registers. In this case setting the value of SLJIT2_VR(i) destroys the
+   value of SLJIT2_FR(i) and vice versa. See SLJIT2_SEPARATE_VECTOR_REGISTERS
    macro. */
 
 /* Vector scratch registers. */
-#define SLJIT_VR0	1
-#define SLJIT_VR1	2
-#define SLJIT_VR2	3
-#define SLJIT_VR3	4
-#define SLJIT_VR4	5
-#define SLJIT_VR5	6
-#define SLJIT_VR6	7
-#define SLJIT_VR7	8
-#define SLJIT_VR8	9
-#define SLJIT_VR9	10
-/* All VR registers provided by the architecture can be accessed by SLJIT_VR(i)
-   The i parameter must be >= 0 and < SLJIT_NUMBER_OF_VECTOR_REGISTERS. */
-#define SLJIT_VR(i)	(1 + (i))
+#define SLJIT2_VR0	1
+#define SLJIT2_VR1	2
+#define SLJIT2_VR2	3
+#define SLJIT2_VR3	4
+#define SLJIT2_VR4	5
+#define SLJIT2_VR5	6
+#define SLJIT2_VR6	7
+#define SLJIT2_VR7	8
+#define SLJIT2_VR8	9
+#define SLJIT2_VR9	10
+/* All VR registers provided by the architecture can be accessed by SLJIT2_VR(i)
+   The i parameter must be >= 0 and < SLJIT2_NUMBER_OF_VECTOR_REGISTERS. */
+#define SLJIT2_VR(i)	(1 + (i))
 
 /* Vector saved registers. */
-#define SLJIT_VS0	(SLJIT_NUMBER_OF_VECTOR_REGISTERS)
-#define SLJIT_VS1	(SLJIT_NUMBER_OF_VECTOR_REGISTERS - 1)
-#define SLJIT_VS2	(SLJIT_NUMBER_OF_VECTOR_REGISTERS - 2)
-#define SLJIT_VS3	(SLJIT_NUMBER_OF_VECTOR_REGISTERS - 3)
-#define SLJIT_VS4	(SLJIT_NUMBER_OF_VECTOR_REGISTERS - 4)
-#define SLJIT_VS5	(SLJIT_NUMBER_OF_VECTOR_REGISTERS - 5)
-#define SLJIT_VS6	(SLJIT_NUMBER_OF_VECTOR_REGISTERS - 6)
-#define SLJIT_VS7	(SLJIT_NUMBER_OF_VECTOR_REGISTERS - 7)
-#define SLJIT_VS8	(SLJIT_NUMBER_OF_VECTOR_REGISTERS - 8)
-#define SLJIT_VS9	(SLJIT_NUMBER_OF_VECTOR_REGISTERS - 9)
-/* All VS registers provided by the architecture can be accessed by SLJIT_VS(i)
-   The i parameter must be >= 0 and < SLJIT_NUMBER_OF_SAVED_VECTOR_REGISTERS. */
-#define SLJIT_VS(i)	(SLJIT_NUMBER_OF_VECTOR_REGISTERS - (i))
+#define SLJIT2_VS0	(SLJIT2_NUMBER_OF_VECTOR_REGISTERS)
+#define SLJIT2_VS1	(SLJIT2_NUMBER_OF_VECTOR_REGISTERS - 1)
+#define SLJIT2_VS2	(SLJIT2_NUMBER_OF_VECTOR_REGISTERS - 2)
+#define SLJIT2_VS3	(SLJIT2_NUMBER_OF_VECTOR_REGISTERS - 3)
+#define SLJIT2_VS4	(SLJIT2_NUMBER_OF_VECTOR_REGISTERS - 4)
+#define SLJIT2_VS5	(SLJIT2_NUMBER_OF_VECTOR_REGISTERS - 5)
+#define SLJIT2_VS6	(SLJIT2_NUMBER_OF_VECTOR_REGISTERS - 6)
+#define SLJIT2_VS7	(SLJIT2_NUMBER_OF_VECTOR_REGISTERS - 7)
+#define SLJIT2_VS8	(SLJIT2_NUMBER_OF_VECTOR_REGISTERS - 8)
+#define SLJIT2_VS9	(SLJIT2_NUMBER_OF_VECTOR_REGISTERS - 9)
+/* All VS registers provided by the architecture can be accessed by SLJIT2_VS(i)
+   The i parameter must be >= 0 and < SLJIT2_NUMBER_OF_SAVED_VECTOR_REGISTERS. */
+#define SLJIT2_VS(i)	(SLJIT2_NUMBER_OF_VECTOR_REGISTERS - (i))
 
-/* Vector registers >= SLJIT_FIRST_SAVED_VECTOR_REG are saved registers. */
-#define SLJIT_FIRST_SAVED_VECTOR_REG (SLJIT_VS0 - SLJIT_NUMBER_OF_SAVED_VECTOR_REGISTERS + 1)
+/* Vector registers >= SLJIT2_FIRST_SAVED_VECTOR_REG are saved registers. */
+#define SLJIT2_FIRST_SAVED_VECTOR_REG (SLJIT2_VS0 - SLJIT2_NUMBER_OF_SAVED_VECTOR_REGISTERS + 1)
 
 /* --------------------------------------------------------------------- */
 /*  Argument type definitions                                            */
 /* --------------------------------------------------------------------- */
 
-/* The following argument type definitions are used by sljit_emit_enter,
-   sljit_set_context, sljit_emit_call, and sljit_emit_icall functions.
+/* The following argument type definitions are used by sljit2_emit_enter,
+   sljit2_set_context, sljit2_emit_call, and sljit2_emit_icall functions.
 
-   For sljit_emit_call and sljit_emit_icall, the first integer argument
-   must be placed into SLJIT_R0, the second one into SLJIT_R1, and so on.
-   Similarly the first floating point argument must be placed into SLJIT_FR0,
-   the second one into SLJIT_FR1, and so on.
+   For sljit2_emit_call and sljit2_emit_icall, the first integer argument
+   must be placed into SLJIT2_R0, the second one into SLJIT2_R1, and so on.
+   Similarly the first floating point argument must be placed into SLJIT2_FR0,
+   the second one into SLJIT2_FR1, and so on.
 
-   For sljit_emit_enter, the integer arguments can be stored in scratch
+   For sljit2_emit_enter, the integer arguments can be stored in scratch
    or saved registers. Scratch registers are identified by a _R suffix.
 
    If only saved registers are used, then the allocation mirrors what is
    done for the "call" functions but using saved registers, meaning that
-   the first integer argument goes to SLJIT_S0, the second one goes into
-   SLJIT_S1, and so on.
+   the first integer argument goes to SLJIT2_S0, the second one goes into
+   SLJIT2_S1, and so on.
 
    If scratch registers are used, then the way the integer registers are
-   allocated changes so that SLJIT_S0, SLJIT_S1, etc; will be assigned
-   only for the arguments not using scratch registers, while SLJIT_R<n>
+   allocated changes so that SLJIT2_S0, SLJIT2_S1, etc; will be assigned
+   only for the arguments not using scratch registers, while SLJIT2_R<n>
    will be used for the ones using scratch registers.
 
    Furthermore, the index (shown as "n" above) that will be used for the
    scratch register depends on how many previous integer registers
-   (scratch or saved) were used already, starting with SLJIT_R0.
+   (scratch or saved) were used already, starting with SLJIT2_R0.
    Eventhough some indexes will be likely skipped, they still need to be
-   accounted for in the scratches parameter of sljit_emit_enter. See below
+   accounted for in the scratches parameter of sljit2_emit_enter. See below
    for some examples.
 
    The floating point arguments always use scratch registers (but not the
-   _R suffix like the integer arguments) and must use SLJIT_FR0, SLJIT_FR1,
+   _R suffix like the integer arguments) and must use SLJIT2_FR0, SLJIT2_FR1,
    just like in the "call" functions.
 
    Note: the mapping for scratch registers is part of the compiler context
-         and therefore a new context after sljit_emit_call/sljit_emit_icall
+         and therefore a new context after sljit2_emit_call/sljit2_emit_icall
          could remove access to some scratch registers that were used as
          arguments.
 
    Example function definition:
-     sljit_f32 SLJIT_FUNC example_c_callback(void *arg_a,
-         sljit_f64 arg_b, sljit_u32 arg_c, sljit_f32 arg_d);
+     sljit2_f32 SLJIT2_FUNC example_c_callback(void *arg_a,
+         sljit2_f64 arg_b, sljit2_u32 arg_c, sljit2_f32 arg_d);
 
    Argument type definition:
-     SLJIT_ARG_RETURN(SLJIT_ARG_TYPE_F32)
-        | SLJIT_ARG_VALUE(SLJIT_ARG_TYPE_P, 1) | SLJIT_ARG_VALUE(SLJIT_ARG_TYPE_F64, 2)
-        | SLJIT_ARG_VALUE(SLJIT_ARG_TYPE_32, 3) | SLJIT_ARG_VALUE(SLJIT_ARG_TYPE_F32, 4)
+     SLJIT2_ARG_RETURN(SLJIT2_ARG_TYPE_F32)
+        | SLJIT2_ARG_VALUE(SLJIT2_ARG_TYPE_P, 1) | SLJIT2_ARG_VALUE(SLJIT2_ARG_TYPE_F64, 2)
+        | SLJIT2_ARG_VALUE(SLJIT2_ARG_TYPE_32, 3) | SLJIT2_ARG_VALUE(SLJIT2_ARG_TYPE_F32, 4)
 
    Short form of argument type definition:
-     SLJIT_ARGS4(F32, P, F64, 32, F32)
+     SLJIT2_ARGS4(F32, P, F64, 32, F32)
 
    Argument passing:
-     arg_a must be placed in SLJIT_R0
-     arg_b must be placed in SLJIT_FR0
-     arg_c must be placed in SLJIT_R1
-     arg_d must be placed in SLJIT_FR1
+     arg_a must be placed in SLJIT2_R0
+     arg_b must be placed in SLJIT2_FR0
+     arg_c must be placed in SLJIT2_R1
+     arg_d must be placed in SLJIT2_FR1
 
-   Examples for argument processing by sljit_emit_enter:
-     SLJIT_ARGS4V(P, 32_R, F32, W)
-     Arguments are placed into: SLJIT_S0, SLJIT_R1, SLJIT_FR0, SLJIT_S1
+   Examples for argument processing by sljit2_emit_enter:
+     SLJIT2_ARGS4V(P, 32_R, F32, W)
+     Arguments are placed into: SLJIT2_S0, SLJIT2_R1, SLJIT2_FR0, SLJIT2_S1
      The type of the result is void.
 
-     SLJIT_ARGS4(F32, W, W_R, W, W_R)
-     Arguments are placed into: SLJIT_S0, SLJIT_R1, SLJIT_S1, SLJIT_R3
-     The type of the result is sljit_f32.
+     SLJIT2_ARGS4(F32, W, W_R, W, W_R)
+     Arguments are placed into: SLJIT2_S0, SLJIT2_R1, SLJIT2_S1, SLJIT2_R3
+     The type of the result is sljit2_f32.
 
-     SLJIT_ARGS4(P, W, F32, P_R)
-     Arguments are placed into: SLJIT_FR0, SLJIT_S0, SLJIT_FR1, SLJIT_R1
+     SLJIT2_ARGS4(P, W, F32, P_R)
+     Arguments are placed into: SLJIT2_FR0, SLJIT2_S0, SLJIT2_FR1, SLJIT2_R1
      The type of the result is pointer.
 
      Note: it is recommended to pass the scratch arguments first
      followed by the saved arguments:
 
-       SLJIT_ARGS4(W, W_R, W_R, W, W)
-       Arguments are placed into: SLJIT_R0, SLJIT_R1, SLJIT_S0, SLJIT_S1
-       The type of the result is sljit_sw / sljit_uw.
+       SLJIT2_ARGS4(W, W_R, W_R, W, W)
+       Arguments are placed into: SLJIT2_R0, SLJIT2_R1, SLJIT2_S0, SLJIT2_S1
+       The type of the result is sljit2_sw / sljit2_uw.
 */
 
 /* The following flag is only allowed for the integer arguments of
-   sljit_emit_enter. When the flag is set, the integer argument is
+   sljit2_emit_enter. When the flag is set, the integer argument is
    stored in a scratch register instead of a saved register. */
-#define SLJIT_ARG_TYPE_SCRATCH_REG 0x8
+#define SLJIT2_ARG_TYPE_SCRATCH_REG 0x8
 
-/* No return value, only supported by SLJIT_ARG_RETURN. */
-#define SLJIT_ARG_TYPE_RET_VOID		0
+/* No return value, only supported by SLJIT2_ARG_RETURN. */
+#define SLJIT2_ARG_TYPE_RET_VOID		0
 /* Machine word sized integer argument or result. */
-#define SLJIT_ARG_TYPE_W		1
-#define SLJIT_ARG_TYPE_W_R	(SLJIT_ARG_TYPE_W | SLJIT_ARG_TYPE_SCRATCH_REG)
+#define SLJIT2_ARG_TYPE_W		1
+#define SLJIT2_ARG_TYPE_W_R	(SLJIT2_ARG_TYPE_W | SLJIT2_ARG_TYPE_SCRATCH_REG)
 /* 32 bit integer argument or result. */
-#define SLJIT_ARG_TYPE_32		2
-#define SLJIT_ARG_TYPE_32_R	(SLJIT_ARG_TYPE_32 | SLJIT_ARG_TYPE_SCRATCH_REG)
+#define SLJIT2_ARG_TYPE_32		2
+#define SLJIT2_ARG_TYPE_32_R	(SLJIT2_ARG_TYPE_32 | SLJIT2_ARG_TYPE_SCRATCH_REG)
 /* Pointer sized integer argument or result. */
-#define SLJIT_ARG_TYPE_P		3
-#define SLJIT_ARG_TYPE_P_R	(SLJIT_ARG_TYPE_P | SLJIT_ARG_TYPE_SCRATCH_REG)
+#define SLJIT2_ARG_TYPE_P		3
+#define SLJIT2_ARG_TYPE_P_R	(SLJIT2_ARG_TYPE_P | SLJIT2_ARG_TYPE_SCRATCH_REG)
 /* 64 bit floating point argument or result. */
-#define SLJIT_ARG_TYPE_F64		4
+#define SLJIT2_ARG_TYPE_F64		4
 /* 32 bit floating point argument or result. */
-#define SLJIT_ARG_TYPE_F32		5
+#define SLJIT2_ARG_TYPE_F32		5
 
-#define SLJIT_ARG_SHIFT 4
-#define SLJIT_ARG_RETURN(type) (type)
-#define SLJIT_ARG_VALUE(type, idx) ((type) << ((idx) * SLJIT_ARG_SHIFT))
+#define SLJIT2_ARG_SHIFT 4
+#define SLJIT2_ARG_RETURN(type) (type)
+#define SLJIT2_ARG_VALUE(type, idx) ((type) << ((idx) * SLJIT2_ARG_SHIFT))
 
 /* Simplified argument list definitions.
 
    The following definition:
-       SLJIT_ARG_RETURN(SLJIT_ARG_TYPE_W) | SLJIT_ARG_VALUE(SLJIT_ARG_TYPE_F32, 1)
+       SLJIT2_ARG_RETURN(SLJIT2_ARG_TYPE_W) | SLJIT2_ARG_VALUE(SLJIT2_ARG_TYPE_F32, 1)
 
    can be shortened to:
-       SLJIT_ARGS1(W, F32)
+       SLJIT2_ARGS1(W, F32)
 
    Another example where no value is returned:
-       SLJIT_ARG_RETURN(SLJIT_ARG_TYPE_RET_VOID) | SLJIT_ARG_VALUE(SLJIT_ARG_TYPE_W_R, 1)
+       SLJIT2_ARG_RETURN(SLJIT2_ARG_TYPE_RET_VOID) | SLJIT2_ARG_VALUE(SLJIT2_ARG_TYPE_W_R, 1)
 
    can be shortened to:
-       SLJIT_ARGS1V(W_R)
+       SLJIT2_ARGS1V(W_R)
 */
 
-#define SLJIT_ARG_TO_TYPE(type) SLJIT_ARG_TYPE_ ## type
+#define SLJIT2_ARG_TO_TYPE(type) SLJIT2_ARG_TYPE_ ## type
 
-#define SLJIT_ARGS0(ret) \
-	SLJIT_ARG_RETURN(SLJIT_ARG_TO_TYPE(ret))
-#define SLJIT_ARGS0V() \
-	SLJIT_ARG_RETURN(SLJIT_ARG_TYPE_RET_VOID)
+#define SLJIT2_ARGS0(ret) \
+	SLJIT2_ARG_RETURN(SLJIT2_ARG_TO_TYPE(ret))
+#define SLJIT2_ARGS0V() \
+	SLJIT2_ARG_RETURN(SLJIT2_ARG_TYPE_RET_VOID)
 
-#define SLJIT_ARGS1(ret, arg1) \
-	(SLJIT_ARGS0(ret) | SLJIT_ARG_VALUE(SLJIT_ARG_TO_TYPE(arg1), 1))
-#define SLJIT_ARGS1V(arg1) \
-	(SLJIT_ARGS0V() | SLJIT_ARG_VALUE(SLJIT_ARG_TO_TYPE(arg1), 1))
+#define SLJIT2_ARGS1(ret, arg1) \
+	(SLJIT2_ARGS0(ret) | SLJIT2_ARG_VALUE(SLJIT2_ARG_TO_TYPE(arg1), 1))
+#define SLJIT2_ARGS1V(arg1) \
+	(SLJIT2_ARGS0V() | SLJIT2_ARG_VALUE(SLJIT2_ARG_TO_TYPE(arg1), 1))
 
-#define SLJIT_ARGS2(ret, arg1, arg2) \
-	(SLJIT_ARGS1(ret, arg1) | SLJIT_ARG_VALUE(SLJIT_ARG_TO_TYPE(arg2), 2))
-#define SLJIT_ARGS2V(arg1, arg2) \
-	(SLJIT_ARGS1V(arg1) | SLJIT_ARG_VALUE(SLJIT_ARG_TO_TYPE(arg2), 2))
+#define SLJIT2_ARGS2(ret, arg1, arg2) \
+	(SLJIT2_ARGS1(ret, arg1) | SLJIT2_ARG_VALUE(SLJIT2_ARG_TO_TYPE(arg2), 2))
+#define SLJIT2_ARGS2V(arg1, arg2) \
+	(SLJIT2_ARGS1V(arg1) | SLJIT2_ARG_VALUE(SLJIT2_ARG_TO_TYPE(arg2), 2))
 
-#define SLJIT_ARGS3(ret, arg1, arg2, arg3) \
-	(SLJIT_ARGS2(ret, arg1, arg2) | SLJIT_ARG_VALUE(SLJIT_ARG_TO_TYPE(arg3), 3))
-#define SLJIT_ARGS3V(arg1, arg2, arg3) \
-	(SLJIT_ARGS2V(arg1, arg2) | SLJIT_ARG_VALUE(SLJIT_ARG_TO_TYPE(arg3), 3))
+#define SLJIT2_ARGS3(ret, arg1, arg2, arg3) \
+	(SLJIT2_ARGS2(ret, arg1, arg2) | SLJIT2_ARG_VALUE(SLJIT2_ARG_TO_TYPE(arg3), 3))
+#define SLJIT2_ARGS3V(arg1, arg2, arg3) \
+	(SLJIT2_ARGS2V(arg1, arg2) | SLJIT2_ARG_VALUE(SLJIT2_ARG_TO_TYPE(arg3), 3))
 
-#define SLJIT_ARGS4(ret, arg1, arg2, arg3, arg4) \
-	(SLJIT_ARGS3(ret, arg1, arg2, arg3) | SLJIT_ARG_VALUE(SLJIT_ARG_TO_TYPE(arg4), 4))
-#define SLJIT_ARGS4V(arg1, arg2, arg3, arg4) \
-	(SLJIT_ARGS3V(arg1, arg2, arg3) | SLJIT_ARG_VALUE(SLJIT_ARG_TO_TYPE(arg4), 4))
+#define SLJIT2_ARGS4(ret, arg1, arg2, arg3, arg4) \
+	(SLJIT2_ARGS3(ret, arg1, arg2, arg3) | SLJIT2_ARG_VALUE(SLJIT2_ARG_TO_TYPE(arg4), 4))
+#define SLJIT2_ARGS4V(arg1, arg2, arg3, arg4) \
+	(SLJIT2_ARGS3V(arg1, arg2, arg3) | SLJIT2_ARG_VALUE(SLJIT2_ARG_TO_TYPE(arg4), 4))
 
 /* --------------------------------------------------------------------- */
 /*  Main structures and functions                                        */
@@ -464,169 +464,169 @@ extern "C" {
 	future. Keeping them here allows code inlining.
 */
 
-struct sljit_memory_fragment {
-	struct sljit_memory_fragment *next;
-	sljit_uw used_size;
-	/* Must be aligned to sljit_sw. */
-	sljit_u8 memory[1];
+struct sljit2_memory_fragment {
+	struct sljit2_memory_fragment *next;
+	sljit2_uw used_size;
+	/* Must be aligned to sljit2_sw. */
+	sljit2_u8 memory[1];
 };
 
-struct sljit_label {
-	struct sljit_label *next;
+struct sljit2_label {
+	struct sljit2_label *next;
 	union {
-		sljit_uw index;
-		sljit_uw addr;
+		sljit2_uw index;
+		sljit2_uw addr;
 	} u;
 	/* The maximum size difference. */
-	sljit_uw size;
+	sljit2_uw size;
 };
 
-struct sljit_jump {
-	struct sljit_jump *next;
-	sljit_uw addr;
+struct sljit2_jump {
+	struct sljit2_jump *next;
+	sljit2_uw addr;
 	/* Architecture dependent flags. */
-	sljit_uw flags;
+	sljit2_uw flags;
 	union {
-		sljit_uw target;
-		struct sljit_label *label;
+		sljit2_uw target;
+		struct sljit2_label *label;
 	} u;
 };
 
-struct sljit_const {
-	struct sljit_const *next;
-	sljit_uw addr;
+struct sljit2_const {
+	struct sljit2_const *next;
+	sljit2_uw addr;
 };
 
-struct sljit_generate_code_buffer {
+struct sljit2_generate_code_buffer {
 	void *buffer;
-	sljit_uw size;
-	sljit_sw executable_offset;
+	sljit2_uw size;
+	sljit2_sw executable_offset;
 };
 
-struct sljit_compiler {
-	sljit_s32 error;
-	sljit_s32 options;
+struct sljit2_compiler {
+	sljit2_s32 error;
+	sljit2_s32 options;
 
-	struct sljit_label *labels;
-	struct sljit_jump *jumps;
-	struct sljit_const *consts;
-	struct sljit_label *last_label;
-	struct sljit_jump *last_jump;
-	struct sljit_const *last_const;
+	struct sljit2_label *labels;
+	struct sljit2_jump *jumps;
+	struct sljit2_const *consts;
+	struct sljit2_label *last_label;
+	struct sljit2_jump *last_jump;
+	struct sljit2_const *last_const;
 
 	void *allocator_data;
 	void *user_data;
-	struct sljit_memory_fragment *buf;
-	struct sljit_memory_fragment *abuf;
+	struct sljit2_memory_fragment *buf;
+	struct sljit2_memory_fragment *abuf;
 
 	/* Number of labels created by the compiler. */
-	sljit_uw label_count;
+	sljit2_uw label_count;
 	/* Available scratch registers. */
-	sljit_s32 scratches;
+	sljit2_s32 scratches;
 	/* Available saved registers. */
-	sljit_s32 saveds;
+	sljit2_s32 saveds;
 	/* Available float scratch registers. */
-	sljit_s32 fscratches;
+	sljit2_s32 fscratches;
 	/* Available float saved registers. */
-	sljit_s32 fsaveds;
+	sljit2_s32 fsaveds;
 	/* Local stack size. */
-	sljit_s32 local_size;
+	sljit2_s32 local_size;
 	/* Maximum code size. */
-	sljit_uw size;
+	sljit2_uw size;
 	/* Relative offset of the executable mapping from the writable mapping. */
-	sljit_sw executable_offset;
+	sljit2_sw executable_offset;
 	/* Executable size for statistical purposes. */
-	sljit_uw executable_size;
+	sljit2_uw executable_size;
 
-#if (defined SLJIT_HAS_STATUS_FLAGS_STATE && SLJIT_HAS_STATUS_FLAGS_STATE)
-	sljit_s32 status_flags_state;
-#endif /* SLJIT_HAS_STATUS_FLAGS_STATE */
+#if (defined SLJIT2_HAS_STATUS_FLAGS_STATE && SLJIT2_HAS_STATUS_FLAGS_STATE)
+	sljit2_s32 status_flags_state;
+#endif /* SLJIT2_HAS_STATUS_FLAGS_STATE */
 
-#if (defined SLJIT_CONFIG_X86_32 && SLJIT_CONFIG_X86_32)
-	sljit_s32 args_size;
-#endif /* SLJIT_CONFIG_X86_32 */
+#if (defined SLJIT2_CONFIG_X86_32 && SLJIT2_CONFIG_X86_32)
+	sljit2_s32 args_size;
+#endif /* SLJIT2_CONFIG_X86_32 */
 
-#if (defined SLJIT_CONFIG_X86_64 && SLJIT_CONFIG_X86_64)
+#if (defined SLJIT2_CONFIG_X86_64 && SLJIT2_CONFIG_X86_64)
 	/* Temporary fields. */
-	sljit_s32 mode32;
-#endif /* SLJIT_CONFIG_X86_64 */
+	sljit2_s32 mode32;
+#endif /* SLJIT2_CONFIG_X86_64 */
 
-#if (defined SLJIT_CONFIG_ARM_V6 && SLJIT_CONFIG_ARM_V6)
+#if (defined SLJIT2_CONFIG_ARM_V6 && SLJIT2_CONFIG_ARM_V6)
 	/* Constant pool handling. */
-	sljit_uw *cpool;
-	sljit_u8 *cpool_unique;
-	sljit_uw cpool_diff;
-	sljit_uw cpool_fill;
+	sljit2_uw *cpool;
+	sljit2_u8 *cpool_unique;
+	sljit2_uw cpool_diff;
+	sljit2_uw cpool_fill;
 	/* Other members. */
 	/* Contains pointer, "ldr pc, [...]" pairs. */
-	sljit_uw patches;
-#endif /* SLJIT_CONFIG_ARM_V6 */
+	sljit2_uw patches;
+#endif /* SLJIT2_CONFIG_ARM_V6 */
 
-#if (defined SLJIT_CONFIG_ARM_V6 && SLJIT_CONFIG_ARM_V6) || (defined SLJIT_CONFIG_ARM_V7 && SLJIT_CONFIG_ARM_V7)
+#if (defined SLJIT2_CONFIG_ARM_V6 && SLJIT2_CONFIG_ARM_V6) || (defined SLJIT2_CONFIG_ARM_V7 && SLJIT2_CONFIG_ARM_V7)
 	/* Temporary fields. */
-	sljit_uw shift_imm;
-#endif /* SLJIT_CONFIG_ARM_V6 || SLJIT_CONFIG_ARM_V6 */
+	sljit2_uw shift_imm;
+#endif /* SLJIT2_CONFIG_ARM_V6 || SLJIT2_CONFIG_ARM_V6 */
 
-#if (defined SLJIT_CONFIG_ARM_32 && SLJIT_CONFIG_ARM_32) && (defined __SOFTFP__)
-	sljit_uw args_size;
-#endif /* SLJIT_CONFIG_ARM_32 && __SOFTFP__ */
+#if (defined SLJIT2_CONFIG_ARM_32 && SLJIT2_CONFIG_ARM_32) && (defined __SOFTFP__)
+	sljit2_uw args_size;
+#endif /* SLJIT2_CONFIG_ARM_32 && __SOFTFP__ */
 
-#if (defined SLJIT_CONFIG_PPC && SLJIT_CONFIG_PPC)
+#if (defined SLJIT2_CONFIG_PPC && SLJIT2_CONFIG_PPC)
 	/* Temporary fields. */
-	sljit_u32 imm;
-#endif /* SLJIT_CONFIG_PPC */
+	sljit2_u32 imm;
+#endif /* SLJIT2_CONFIG_PPC */
 
-#if (defined SLJIT_CONFIG_MIPS && SLJIT_CONFIG_MIPS)
-	sljit_s32 delay_slot;
+#if (defined SLJIT2_CONFIG_MIPS && SLJIT2_CONFIG_MIPS)
+	sljit2_s32 delay_slot;
 	/* Temporary fields. */
-	sljit_s32 cache_arg;
-	sljit_sw cache_argw;
-#endif /* SLJIT_CONFIG_MIPS */
+	sljit2_s32 cache_arg;
+	sljit2_sw cache_argw;
+#endif /* SLJIT2_CONFIG_MIPS */
 
-#if (defined SLJIT_CONFIG_MIPS_32 && SLJIT_CONFIG_MIPS_32)
-	sljit_uw args_size;
-#endif /* SLJIT_CONFIG_MIPS_32 */
+#if (defined SLJIT2_CONFIG_MIPS_32 && SLJIT2_CONFIG_MIPS_32)
+	sljit2_uw args_size;
+#endif /* SLJIT2_CONFIG_MIPS_32 */
 
-#if (defined SLJIT_CONFIG_RISCV && SLJIT_CONFIG_RISCV)
+#if (defined SLJIT2_CONFIG_RISCV && SLJIT2_CONFIG_RISCV)
 	/* Temporary fields. */
-	sljit_s32 cache_arg;
-	sljit_sw cache_argw;
-#endif /* SLJIT_CONFIG_RISCV */
+	sljit2_s32 cache_arg;
+	sljit2_sw cache_argw;
+#endif /* SLJIT2_CONFIG_RISCV */
 
-#if (defined SLJIT_CONFIG_S390X && SLJIT_CONFIG_S390X)
+#if (defined SLJIT2_CONFIG_S390X && SLJIT2_CONFIG_S390X)
 	/* Need to allocate register save area to make calls. */
 	/* Temporary fields. */
-	sljit_s32 mode;
-#endif /* SLJIT_CONFIG_S390X */
+	sljit2_s32 mode;
+#endif /* SLJIT2_CONFIG_S390X */
 
-#if (defined SLJIT_CONFIG_LOONGARCH && SLJIT_CONFIG_LOONGARCH)
+#if (defined SLJIT2_CONFIG_LOONGARCH && SLJIT2_CONFIG_LOONGARCH)
 	/* Temporary fields. */
-	sljit_s32 cache_arg;
-	sljit_sw cache_argw;
-#endif /* SLJIT_CONFIG_LOONGARCH */
+	sljit2_s32 cache_arg;
+	sljit2_sw cache_argw;
+#endif /* SLJIT2_CONFIG_LOONGARCH */
 
-#if (defined SLJIT_VERBOSE && SLJIT_VERBOSE)
+#if (defined SLJIT2_VERBOSE && SLJIT2_VERBOSE)
 	FILE* verbose;
-#endif /* SLJIT_VERBOSE */
+#endif /* SLJIT2_VERBOSE */
 
-#if (defined SLJIT_ARGUMENT_CHECKS && SLJIT_ARGUMENT_CHECKS) \
-		|| (defined SLJIT_DEBUG && SLJIT_DEBUG)
+#if (defined SLJIT2_ARGUMENT_CHECKS && SLJIT2_ARGUMENT_CHECKS) \
+		|| (defined SLJIT2_DEBUG && SLJIT2_DEBUG)
 	/* Flags specified by the last arithmetic instruction.
 	   It contains the type of the variable flag. */
-	sljit_s32 last_flags;
+	sljit2_s32 last_flags;
 	/* Return value type set by entry functions. */
-	sljit_s32 last_return;
+	sljit2_s32 last_return;
 	/* Local size passed to entry functions. */
-	sljit_s32 logical_local_size;
-#endif /* SLJIT_ARGUMENT_CHECKS || SLJIT_DEBUG */
+	sljit2_s32 logical_local_size;
+#endif /* SLJIT2_ARGUMENT_CHECKS || SLJIT2_DEBUG */
 
-#if (defined SLJIT_ARGUMENT_CHECKS && SLJIT_ARGUMENT_CHECKS) \
-		|| (defined SLJIT_DEBUG && SLJIT_DEBUG) \
-		|| (defined SLJIT_VERBOSE && SLJIT_VERBOSE)
+#if (defined SLJIT2_ARGUMENT_CHECKS && SLJIT2_ARGUMENT_CHECKS) \
+		|| (defined SLJIT2_DEBUG && SLJIT2_DEBUG) \
+		|| (defined SLJIT2_VERBOSE && SLJIT2_VERBOSE)
 	/* Trust arguments when an API function is called.
 	   Used internally for calling API functions. */
-	sljit_s32 skip_checks;
-#endif /* SLJIT_ARGUMENT_CHECKS || SLJIT_DEBUG || SLJIT_VERBOSE */
+	sljit2_s32 skip_checks;
+#endif /* SLJIT2_ARGUMENT_CHECKS || SLJIT2_DEBUG || SLJIT2_VERBOSE */
 };
 
 /* --------------------------------------------------------------------- */
@@ -634,72 +634,72 @@ struct sljit_compiler {
 /* --------------------------------------------------------------------- */
 
 /* Creates an SLJIT compiler. The allocator_data is required by some
-   custom memory managers. This pointer is passed to SLJIT_MALLOC
-   and SLJIT_FREE macros. Most allocators (including the default
+   custom memory managers. This pointer is passed to SLJIT2_MALLOC
+   and SLJIT2_FREE macros. Most allocators (including the default
    one) ignores this value, and it is recommended to pass NULL
    as a dummy value for allocator_data.
 
    Returns NULL if failed. */
-SLJIT_API_FUNC_ATTRIBUTE struct sljit_compiler* sljit_create_compiler(void *allocator_data);
+SLJIT2_API_FUNC_ATTRIBUTE struct sljit2_compiler* sljit2_create_compiler(void *allocator_data);
 
 /* Frees everything except the compiled machine code. */
-SLJIT_API_FUNC_ATTRIBUTE void sljit_free_compiler(struct sljit_compiler *compiler);
+SLJIT2_API_FUNC_ATTRIBUTE void sljit2_free_compiler(struct sljit2_compiler *compiler);
 
 /* Returns the current error code. If an error occurres, future calls
    which uses the same compiler argument returns early with the same
    error code. Thus there is no need for checking the error after every
    call, it is enough to do it after the code is compiled. Removing
    these checks increases the performance of the compiling process. */
-static SLJIT_INLINE sljit_s32 sljit_get_compiler_error(struct sljit_compiler *compiler) { return compiler->error; }
+static SLJIT2_INLINE sljit2_s32 sljit2_get_compiler_error(struct sljit2_compiler *compiler) { return compiler->error; }
 
-/* Sets the compiler error code to SLJIT_ERR_ALLOC_FAILED except
+/* Sets the compiler error code to SLJIT2_ERR_ALLOC_FAILED except
    if an error was detected before. After the error code is set
    the compiler behaves as if the allocation failure happened
    during an SLJIT function call. This can greatly simplify error
    checking, since it is enough to check the compiler status
    after the code is compiled. */
-SLJIT_API_FUNC_ATTRIBUTE void sljit_set_compiler_memory_error(struct sljit_compiler *compiler);
+SLJIT2_API_FUNC_ATTRIBUTE void sljit2_set_compiler_memory_error(struct sljit2_compiler *compiler);
 
 /* Allocate a small amount of memory. The size must be <= 64 bytes on 32 bit,
    and <= 128 bytes on 64 bit architectures. The memory area is owned by the
-   compiler, and freed by sljit_free_compiler. The returned pointer is
-   sizeof(sljit_sw) aligned. Excellent for allocating small blocks during
+   compiler, and freed by sljit2_free_compiler. The returned pointer is
+   sizeof(sljit2_sw) aligned. Excellent for allocating small blocks during
    compiling, and no need to worry about freeing them. The size is enough
    to contain at most 16 pointers. If the size is outside of the range,
    the function will return with NULL. However, this return value does not
    indicate that there is no more memory (does not set the current error code
    of the compiler to out-of-memory status). */
-SLJIT_API_FUNC_ATTRIBUTE void* sljit_alloc_memory(struct sljit_compiler *compiler, sljit_s32 size);
+SLJIT2_API_FUNC_ATTRIBUTE void* sljit2_alloc_memory(struct sljit2_compiler *compiler, sljit2_s32 size);
 
-/* Returns the allocator data passed to sljit_create_compiler. */
-static SLJIT_INLINE void* sljit_compiler_get_allocator_data(struct sljit_compiler *compiler) { return compiler->allocator_data; }
+/* Returns the allocator data passed to sljit2_create_compiler. */
+static SLJIT2_INLINE void* sljit2_compiler_get_allocator_data(struct sljit2_compiler *compiler) { return compiler->allocator_data; }
 /* Sets/get the user data for a compiler. */
-static SLJIT_INLINE void sljit_compiler_set_user_data(struct sljit_compiler *compiler, void *user_data) { compiler->user_data = user_data; }
-static SLJIT_INLINE void* sljit_compiler_get_user_data(struct sljit_compiler *compiler) { return compiler->user_data; }
+static SLJIT2_INLINE void sljit2_compiler_set_user_data(struct sljit2_compiler *compiler, void *user_data) { compiler->user_data = user_data; }
+static SLJIT2_INLINE void* sljit2_compiler_get_user_data(struct sljit2_compiler *compiler) { return compiler->user_data; }
 
-#if (defined SLJIT_VERBOSE && SLJIT_VERBOSE)
+#if (defined SLJIT2_VERBOSE && SLJIT2_VERBOSE)
 /* Passing NULL disables verbose. */
-SLJIT_API_FUNC_ATTRIBUTE void sljit_compiler_verbose(struct sljit_compiler *compiler, FILE* verbose);
+SLJIT2_API_FUNC_ATTRIBUTE void sljit2_compiler_verbose(struct sljit2_compiler *compiler, FILE* verbose);
 #endif
 
-/* Option bits for sljit_generate_code. */
+/* Option bits for sljit2_generate_code. */
 
 /* The exec_allocator_data points to a pre-allocated
-   buffer which type is sljit_generate_code_buffer. */
-#define SLJIT_GENERATE_CODE_BUFFER		0x1
+   buffer which type is sljit2_generate_code_buffer. */
+#define SLJIT2_GENERATE_CODE_BUFFER		0x1
 
 /* Create executable code from the instruction stream. This is the final step
    of the code generation, and no more instructions can be emitted after this call.
 
-   options is the combination of SLJIT_GENERATE_CODE_* bits
-   exec_allocator_data is passed to SLJIT_MALLOC_EXEC and
-                       SLJIT_MALLOC_FREE functions */
+   options is the combination of SLJIT2_GENERATE_CODE_* bits
+   exec_allocator_data is passed to SLJIT2_MALLOC_EXEC and
+                       SLJIT2_MALLOC_FREE functions */
 
-SLJIT_API_FUNC_ATTRIBUTE void* sljit_generate_code(struct sljit_compiler *compiler, sljit_s32 options, void *exec_allocator_data);
+SLJIT2_API_FUNC_ATTRIBUTE void* sljit2_generate_code(struct sljit2_compiler *compiler, sljit2_s32 options, void *exec_allocator_data);
 
 /* Free executable code. */
 
-SLJIT_API_FUNC_ATTRIBUTE void sljit_free_code(void* code, void *exec_allocator_data);
+SLJIT2_API_FUNC_ATTRIBUTE void sljit2_free_code(void* code, void *exec_allocator_data);
 
 /* When the protected executable allocator is used the JIT code is mapped
    twice. The first mapping has read/write and the second mapping has read/exec
@@ -710,13 +710,13 @@ SLJIT_API_FUNC_ATTRIBUTE void sljit_free_code(void* code, void *exec_allocator_d
    Dynamic code modifications requires this value.
 
    Before a successful code generation, this function returns with 0. */
-static SLJIT_INLINE sljit_sw sljit_get_executable_offset(struct sljit_compiler *compiler) { return compiler->executable_offset; }
+static SLJIT2_INLINE sljit2_sw sljit2_get_executable_offset(struct sljit2_compiler *compiler) { return compiler->executable_offset; }
 
 /* The executable memory consumption of the generated code can be retrieved by
    this function. The returned value can be used for statistical purposes.
 
    Before a successful code generation, this function returns with 0. */
-static SLJIT_INLINE sljit_uw sljit_get_generated_code_size(struct sljit_compiler *compiler) { return compiler->executable_size; }
+static SLJIT2_INLINE sljit2_uw sljit2_get_generated_code_size(struct sljit2_compiler *compiler) { return compiler->executable_size; }
 
 /* Returns with non-zero if the feature or limitation type passed as its
    argument is present on the current CPU. The return value is one, if a
@@ -729,59 +729,59 @@ static SLJIT_INLINE sljit_uw sljit_get_generated_code_size(struct sljit_compiler
    general case is supported but it has extra performance costs. */
 
 /* [Not emulated] Floating-point support is available. */
-#define SLJIT_HAS_FPU			0
+#define SLJIT2_HAS_FPU			0
 /* [Limitation] Some registers are virtual registers. */
-#define SLJIT_HAS_VIRTUAL_REGISTERS	1
+#define SLJIT2_HAS_VIRTUAL_REGISTERS	1
 /* [Emulated] Has zero register (setting a memory location to zero is efficient). */
-#define SLJIT_HAS_ZERO_REGISTER		2
+#define SLJIT2_HAS_ZERO_REGISTER		2
 /* [Emulated] Count leading zero is supported. */
-#define SLJIT_HAS_CLZ			3
+#define SLJIT2_HAS_CLZ			3
 /* [Emulated] Count trailing zero is supported. */
-#define SLJIT_HAS_CTZ			4
+#define SLJIT2_HAS_CTZ			4
 /* [Emulated] Reverse the order of bytes is supported. */
-#define SLJIT_HAS_REV			5
+#define SLJIT2_HAS_REV			5
 /* [Emulated] Rotate left/right is supported. */
-#define SLJIT_HAS_ROT			6
+#define SLJIT2_HAS_ROT			6
 /* [Emulated] Conditional move is supported. */
-#define SLJIT_HAS_CMOV			7
+#define SLJIT2_HAS_CMOV			7
 /* [Emulated] Prefetch instruction is available (emulated as a nop). */
-#define SLJIT_HAS_PREFETCH		8
-/* [Emulated] Copy from/to f32 operation is available (see sljit_emit_fcopy). */
-#define SLJIT_HAS_COPY_F32		9
-/* [Emulated] Copy from/to f64 operation is available (see sljit_emit_fcopy). */
-#define SLJIT_HAS_COPY_F64		10
+#define SLJIT2_HAS_PREFETCH		8
+/* [Emulated] Copy from/to f32 operation is available (see sljit2_emit_fcopy). */
+#define SLJIT2_HAS_COPY_F32		9
+/* [Emulated] Copy from/to f64 operation is available (see sljit2_emit_fcopy). */
+#define SLJIT2_HAS_COPY_F64		10
 /* [Not emulated] The 64 bit floating point registers can be used as
    two separate 32 bit floating point registers (e.g. ARM32). The
-   second 32 bit part can be accessed by SLJIT_F64_SECOND. */
-#define SLJIT_HAS_F64_AS_F32_PAIR	11
+   second 32 bit part can be accessed by SLJIT2_F64_SECOND. */
+#define SLJIT2_HAS_F64_AS_F32_PAIR	11
 /* [Not emulated] Some SIMD operations are supported by the compiler. */
-#define SLJIT_HAS_SIMD			12
+#define SLJIT2_HAS_SIMD			12
 /* [Not emulated] SIMD registers are mapped to a pair of double precision
-   floating point registers. E.g. passing either SLJIT_FR0 or SLJIT_FR1 to
-   a simd operation represents the same 128 bit register, and both SLJIT_FR0
-   and SLJIT_FR1 are overwritten. */
-#define SLJIT_SIMD_REGS_ARE_PAIRS	13
+   floating point registers. E.g. passing either SLJIT2_FR0 or SLJIT2_FR1 to
+   a simd operation represents the same 128 bit register, and both SLJIT2_FR0
+   and SLJIT2_FR1 are overwritten. */
+#define SLJIT2_SIMD_REGS_ARE_PAIRS	13
 /* [Not emulated] Atomic support is available. */
-#define SLJIT_HAS_ATOMIC		14
+#define SLJIT2_HAS_ATOMIC		14
 /* [Not emulated] Memory barrier support is available. */
-#define SLJIT_HAS_MEMORY_BARRIER		15
+#define SLJIT2_HAS_MEMORY_BARRIER		15
 
-#if (defined SLJIT_CONFIG_X86 && SLJIT_CONFIG_X86)
+#if (defined SLJIT2_CONFIG_X86 && SLJIT2_CONFIG_X86)
 /* [Not emulated] AVX support is available on x86. */
-#define SLJIT_HAS_AVX			100
+#define SLJIT2_HAS_AVX			100
 /* [Not emulated] AVX2 support is available on x86. */
-#define SLJIT_HAS_AVX2			101
+#define SLJIT2_HAS_AVX2			101
 #endif
 
-#if (defined SLJIT_CONFIG_LOONGARCH)
+#if (defined SLJIT2_CONFIG_LOONGARCH)
 /* [Not emulated] LASX support is available on LoongArch */
-#define SLJIT_HAS_LASX        201
+#define SLJIT2_HAS_LASX        201
 #endif
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_has_cpu_feature(sljit_s32 feature_type);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_has_cpu_feature(sljit2_s32 feature_type);
 
-/* If type is between SLJIT_ORDERED_EQUAL and SLJIT_ORDERED_LESS_EQUAL,
-   sljit_cmp_info returns with:
+/* If type is between SLJIT2_ORDERED_EQUAL and SLJIT2_ORDERED_LESS_EQUAL,
+   sljit2_cmp_info returns with:
      zero - if the cpu supports the floating point comparison type
      one - if the comparison requires two machine instructions
      two - if the comparison requires more than two machine instructions
@@ -790,10 +790,10 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_has_cpu_feature(sljit_s32 feature_type)
    using the specified comparison type if it is easy to do so.
 
    Otherwise it returns zero. */
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_cmp_info(sljit_s32 type);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_cmp_info(sljit2_s32 type);
 
 /* The following functions generate machine code. If there is no
-   error, they return with SLJIT_SUCCESS, otherwise they return
+   error, they return with SLJIT2_SUCCESS, otherwise they return
    with an error code. */
 
 /*
@@ -801,143 +801,143 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_cmp_info(sljit_s32 type);
    of the C language. Function calls must conform with the ABI
    (Application Binary Interface) of the target platform, which
    specify the purpose of machine registers and stack handling
-   among other things. The sljit_emit_enter function emits the
+   among other things. The sljit2_emit_enter function emits the
    necessary instructions for setting up an entry point for the
    executable code. This is often called as function prologue.
 
    The "options" argument can be used to pass configuration options
    to the sljit compiler which affects the generated code, until
-   another sljit_emit_enter or sljit_set_context is called. The
-   available options are listed before sljit_emit_enter.
+   another sljit2_emit_enter or sljit2_set_context is called. The
+   available options are listed before sljit2_emit_enter.
 
-   The function argument list is specified by the SLJIT_ARGSx
-   (SLJIT_ARGS0 .. SLJIT_ARGS4) macros. Currently maximum four
-   arguments are supported. See the description of SLJIT_ARGSx
+   The function argument list is specified by the SLJIT2_ARGSx
+   (SLJIT2_ARGS0 .. SLJIT2_ARGS4) macros. Currently maximum four
+   arguments are supported. See the description of SLJIT2_ARGSx
    macros about argument passing.
 
    The register set used by the function must be declared as well.
    The number of scratch and saved registers available to the
-   function must be passed to sljit_emit_enter. Only R registers
+   function must be passed to sljit2_emit_enter. Only R registers
    between R0 and "scratches" argument can be used later. E.g.
    if "scratches" is set to two, the scratch register set will
-   be limited to SLJIT_R0 and SLJIT_R1. The S registers are
+   be limited to SLJIT2_R0 and SLJIT2_R1. The S registers are
    declared in a similar manner, but their count is specified
    by "saveds" argument. The floating point scratch and saved
    registers can be set by using "scratches" and "saveds" argument
-   as well, but their value must be passed to the SLJIT_ENTER_FLOAT
+   as well, but their value must be passed to the SLJIT2_ENTER_FLOAT
    macro, see below.
 
-   The sljit_emit_enter is also capable of allocating a stack
+   The sljit2_emit_enter is also capable of allocating a stack
    space for local data. The "local_size" argument contains the
    size in bytes of this local area, and it can be accessed using
-   SLJIT_MEM1(SLJIT_SP). The memory area between SLJIT_SP (inclusive)
-   and SLJIT_SP + local_size (exclusive) can be modified freely
+   SLJIT2_MEM1(SLJIT2_SP). The memory area between SLJIT2_SP (inclusive)
+   and SLJIT2_SP + local_size (exclusive) can be modified freely
    until the function returns. The alocated stack space is an
    uninitialized memory area.
 
    Floating point scratch and saved registers must be specified
-   by the SLJIT_ENTER_FLOAT macro, which result value should be
+   by the SLJIT2_ENTER_FLOAT macro, which result value should be
    combined with scratches / saveds argument.
 
    Examples:
        To use three scratch and four floating point scratch
        registers, the "scratches" argument must be set to:
-            3 | SLJIT_ENTER_FLOAT(4)
+            3 | SLJIT2_ENTER_FLOAT(4)
 
        To use six saved and five floating point saved
        registers, the "saveds" argument must be set to:
-            6 | SLJIT_ENTER_FLOAT(5)
+            6 | SLJIT2_ENTER_FLOAT(5)
 
    Note: the following conditions must met:
-         0 <= scratches <= SLJIT_NUMBER_OF_REGISTERS
-         0 <= saveds <= SLJIT_NUMBER_OF_SAVED_REGISTERS
-         scratches + saveds <= SLJIT_NUMBER_OF_REGISTERS
+         0 <= scratches <= SLJIT2_NUMBER_OF_REGISTERS
+         0 <= saveds <= SLJIT2_NUMBER_OF_SAVED_REGISTERS
+         scratches + saveds <= SLJIT2_NUMBER_OF_REGISTERS
 
-         0 <= float scratches <= SLJIT_NUMBER_OF_FLOAT_REGISTERS
-         0 <= float saveds <= SLJIT_NUMBER_OF_SAVED_FLOAT_REGISTERS
-         float scratches + float saveds <= SLJIT_NUMBER_OF_FLOAT_REGISTERS
+         0 <= float scratches <= SLJIT2_NUMBER_OF_FLOAT_REGISTERS
+         0 <= float saveds <= SLJIT2_NUMBER_OF_SAVED_FLOAT_REGISTERS
+         float scratches + float saveds <= SLJIT2_NUMBER_OF_FLOAT_REGISTERS
 
    Note: the compiler can use saved registers as scratch registers,
          but the opposite is not supported
 
-   Note: every call of sljit_emit_enter and sljit_set_context
+   Note: every call of sljit2_emit_enter and sljit2_set_context
          overwrites the previous context.
 */
 
-/* The following options are available for sljit_emit_enter. */
+/* The following options are available for sljit2_emit_enter. */
 
-/* Saved registers between SLJIT_S0 and SLJIT_S(n - 1) (inclusive)
+/* Saved registers between SLJIT2_S0 and SLJIT2_S(n - 1) (inclusive)
    are not saved / restored on function enter / return. Instead,
    these registers can be used to pass / return data (such as
    global / local context pointers) across function calls. The
    value of n must be between 1 and 3. This option is only
-   supported by SLJIT_ENTER_REG_ARG calling convention. */
-#define SLJIT_ENTER_KEEP(n)		(n)
+   supported by SLJIT2_ENTER_REG_ARG calling convention. */
+#define SLJIT2_ENTER_KEEP(n)		(n)
 
 /* The compiled function uses an SLJIT specific register argument
    calling convention. This is a lightweight function call type where
    both the caller and the called functions must be compiled by
-   SLJIT. The type argument of the call must be SLJIT_CALL_REG_ARG
+   SLJIT. The type argument of the call must be SLJIT2_CALL_REG_ARG
    and all arguments must be stored in scratch registers. */
-#define SLJIT_ENTER_REG_ARG		0x00000004
+#define SLJIT2_ENTER_REG_ARG		0x00000004
 
-#if (defined SLJIT_CONFIG_X86 && SLJIT_CONFIG_X86)
+#if (defined SLJIT2_CONFIG_X86 && SLJIT2_CONFIG_X86)
 /* Use VEX prefix for all SIMD operations on x86. */
-#define SLJIT_ENTER_USE_VEX		0x00010000
-#endif /* !SLJIT_CONFIG_X86 */
+#define SLJIT2_ENTER_USE_VEX		0x00010000
+#endif /* !SLJIT2_CONFIG_X86 */
 
-/* Macros for other sljit_emit_enter arguments. */
+/* Macros for other sljit2_emit_enter arguments. */
 
 /* Floating point scratch and saved registers can be
-   specified by SLJIT_ENTER_FLOAT. */
-#define SLJIT_ENTER_FLOAT(regs)		((regs) << 8)
+   specified by SLJIT2_ENTER_FLOAT. */
+#define SLJIT2_ENTER_FLOAT(regs)		((regs) << 8)
 
-/* The local_size must be >= 0 and <= SLJIT_MAX_LOCAL_SIZE. */
-#define SLJIT_MAX_LOCAL_SIZE		1048576
+/* The local_size must be >= 0 and <= SLJIT2_MAX_LOCAL_SIZE. */
+#define SLJIT2_MAX_LOCAL_SIZE		1048576
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compiler,
-	sljit_s32 options, sljit_s32 arg_types,
-	sljit_s32 scratches, sljit_s32 saveds, sljit_s32 local_size);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_enter(struct sljit2_compiler *compiler,
+	sljit2_s32 options, sljit2_s32 arg_types,
+	sljit2_s32 scratches, sljit2_s32 saveds, sljit2_s32 local_size);
 
 /* The SLJIT compiler has a current context (which contains the local
    stack space size, number of used registers, etc.) which is initialized
-   by sljit_emit_enter. Several functions (such as sljit_emit_return)
+   by sljit2_emit_enter. Several functions (such as sljit2_emit_return)
    requires this context to be able to generate the appropriate code.
    However, some code fragments (compiled separately) may have no
    normal entry point so their context is unknown to the compiler.
 
-   sljit_set_context and sljit_emit_enter have the same arguments,
-   but sljit_set_context does not generate any machine code.
+   sljit2_set_context and sljit2_emit_enter have the same arguments,
+   but sljit2_set_context does not generate any machine code.
 
-   Note: every call of sljit_emit_enter and sljit_set_context overwrites
+   Note: every call of sljit2_emit_enter and sljit2_set_context overwrites
          the previous context. */
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_set_context(struct sljit_compiler *compiler,
-	sljit_s32 options, sljit_s32 arg_types,
-	sljit_s32 scratches, sljit_s32 saveds, sljit_s32 local_size);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_set_context(struct sljit2_compiler *compiler,
+	sljit2_s32 options, sljit2_s32 arg_types,
+	sljit2_s32 scratches, sljit2_s32 saveds, sljit2_s32 local_size);
 
-/* Return to the caller function. The sljit_emit_return_void function
-   does not return with any value. The sljit_emit_return function returns
+/* Return to the caller function. The sljit2_emit_return_void function
+   does not return with any value. The sljit2_emit_return function returns
    with a single value loaded from its source operand. The load operation
-   can be between SLJIT_MOV and SLJIT_MOV_P (see sljit_emit_op1) and
-   SLJIT_MOV_F32/SLJIT_MOV_F64 (see sljit_emit_fop1) depending on the
-   return value specified by sljit_emit_enter/sljit_set_context. */
+   can be between SLJIT2_MOV and SLJIT2_MOV_P (see sljit2_emit_op1) and
+   SLJIT2_MOV_F32/SLJIT2_MOV_F64 (see sljit2_emit_fop1) depending on the
+   return value specified by sljit2_emit_enter/sljit2_set_context. */
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_return_void(struct sljit_compiler *compiler);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_return_void(struct sljit2_compiler *compiler);
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_return(struct sljit_compiler *compiler, sljit_s32 op,
-	sljit_s32 src, sljit_sw srcw);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_return(struct sljit2_compiler *compiler, sljit2_s32 op,
+	sljit2_s32 src, sljit2_sw srcw);
 
 /* Restores the saved registers and free the stack area, then the execution
    continues from the address specified by the source operand. This
-   operation is similar to sljit_emit_return, but it ignores the return
+   operation is similar to sljit2_emit_return, but it ignores the return
    address. The code where the exection continues should use the same context
-   as the caller function (see sljit_set_context). A word (pointer) value
-   can be passed in the SLJIT_RETURN_REG register. This function can be used
+   as the caller function (see sljit2_set_context). A word (pointer) value
+   can be passed in the SLJIT2_RETURN_REG register. This function can be used
    to jump to exception handlers. */
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_return_to(struct sljit_compiler *compiler,
-	sljit_s32 src, sljit_sw srcw);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_return_to(struct sljit2_compiler *compiler,
+	sljit2_s32 src, sljit2_sw srcw);
 
 /*
    Source and destination operands for arithmetical instructions
@@ -952,16 +952,16 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_return_to(struct sljit_compiler *c
 
 /*
    IMPORTANT NOTE: memory accesses MUST be naturally aligned unless
-                   SLJIT_UNALIGNED macro is defined and its value is 1.
+                   SLJIT2_UNALIGNED macro is defined and its value is 1.
 
      length | alignment
    ---------+-----------
      byte   | 1 byte (any physical_address is accepted)
      half   | 2 byte (physical_address & 0x1 == 0)
      int    | 4 byte (physical_address & 0x3 == 0)
-     word   | 4 byte if SLJIT_32BIT_ARCHITECTURE is defined and its value is 1
-            | 8 byte if SLJIT_64BIT_ARCHITECTURE is defined and its value is 1
-    pointer | size of sljit_up type (4 byte on 32 bit machines, 4 or 8 byte
+     word   | 4 byte if SLJIT2_32BIT_ARCHITECTURE is defined and its value is 1
+            | 8 byte if SLJIT2_64BIT_ARCHITECTURE is defined and its value is 1
+    pointer | size of sljit2_up type (4 byte on 32 bit machines, 4 or 8 byte
             | on 64 bit machines)
 
    Note:   Different architectures have different addressing limitations.
@@ -1003,28 +1003,28 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_return_to(struct sljit_compiler *c
 */
 
 /* Macros for specifying operand types. */
-#define SLJIT_MEM		0x80
-#define SLJIT_MEM0()		(SLJIT_MEM)
-#define SLJIT_MEM1(r1)		(SLJIT_MEM | (r1))
-#define SLJIT_MEM2(r1, r2)	(SLJIT_MEM | (r1) | ((r2) << 8))
-#define SLJIT_IMM		0x7f
-#define SLJIT_REG_PAIR(r1, r2)	((r1) | ((r2) << 8))
+#define SLJIT2_MEM		0x80
+#define SLJIT2_MEM0()		(SLJIT2_MEM)
+#define SLJIT2_MEM1(r1)		(SLJIT2_MEM | (r1))
+#define SLJIT2_MEM2(r1, r2)	(SLJIT2_MEM | (r1) | ((r2) << 8))
+#define SLJIT2_IMM		0x7f
+#define SLJIT2_REG_PAIR(r1, r2)	((r1) | ((r2) << 8))
 
 /* Macros for checking operand types (only for valid arguments). */
-#define SLJIT_IS_REG(arg)	((arg) > 0 && (arg) < SLJIT_IMM)
-#define SLJIT_IS_MEM(arg)	((arg) & SLJIT_MEM)
-#define SLJIT_IS_MEM0(arg)	((arg) == SLJIT_MEM)
-#define SLJIT_IS_MEM1(arg)	((arg) > SLJIT_MEM && (arg) < (SLJIT_MEM << 1))
-#define SLJIT_IS_MEM2(arg)	(((arg) & SLJIT_MEM) && (arg) >= (SLJIT_MEM << 1))
-#define SLJIT_IS_IMM(arg)	((arg) == SLJIT_IMM)
-#define SLJIT_IS_REG_PAIR(arg)	(!((arg) & SLJIT_MEM) && (arg) >= (SLJIT_MEM << 1))
+#define SLJIT2_IS_REG(arg)	((arg) > 0 && (arg) < SLJIT2_IMM)
+#define SLJIT2_IS_MEM(arg)	((arg) & SLJIT2_MEM)
+#define SLJIT2_IS_MEM0(arg)	((arg) == SLJIT2_MEM)
+#define SLJIT2_IS_MEM1(arg)	((arg) > SLJIT2_MEM && (arg) < (SLJIT2_MEM << 1))
+#define SLJIT2_IS_MEM2(arg)	(((arg) & SLJIT2_MEM) && (arg) >= (SLJIT2_MEM << 1))
+#define SLJIT2_IS_IMM(arg)	((arg) == SLJIT2_IMM)
+#define SLJIT2_IS_REG_PAIR(arg)	(!((arg) & SLJIT2_MEM) && (arg) >= (SLJIT2_MEM << 1))
 
 /* Macros for extracting registers from operands. */
 /* Support operands which contains a single register or
-   constructed using SLJIT_MEM1, SLJIT_MEM2, or SLJIT_REG_PAIR. */
-#define SLJIT_EXTRACT_REG(arg)		((arg) & 0x7f)
-/* Support operands which constructed using SLJIT_MEM2, or SLJIT_REG_PAIR. */
-#define SLJIT_EXTRACT_SECOND_REG(arg)	((arg) >> 8)
+   constructed using SLJIT2_MEM1, SLJIT2_MEM2, or SLJIT2_REG_PAIR. */
+#define SLJIT2_EXTRACT_REG(arg)		((arg) & 0x7f)
+/* Support operands which constructed using SLJIT2_MEM2, or SLJIT2_REG_PAIR. */
+#define SLJIT2_EXTRACT_SECOND_REG(arg)	((arg) >> 8)
 
 /* Sets 32 bit operation mode on 64 bit CPUs. This option is ignored on
    32 bit CPUs. When this option is set for an arithmetic operation, only
@@ -1035,26 +1035,26 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_return_to(struct sljit_compiler *c
    requirements all source registers must be the result of those operations
    where this option was also set. Memory loads read 32 bit values rather
    than 64 bit ones. In other words 32 bit and 64 bit operations cannot be
-   mixed. The only exception is SLJIT_MOV32 which source register can hold
+   mixed. The only exception is SLJIT2_MOV32 which source register can hold
    any 32 or 64 bit value, and it is converted to a 32 bit compatible format
    first. When the source and destination registers are the same, this
    conversion is free (no instructions are emitted) on most CPUs. A 32 bit
-   value can also be converted to a 64 bit value by SLJIT_MOV_S32
-   (sign extension) or SLJIT_MOV_U32 (zero extension).
+   value can also be converted to a 64 bit value by SLJIT2_MOV_S32
+   (sign extension) or SLJIT2_MOV_U32 (zero extension).
 
    As for floating-point operations, this option sets 32 bit single
    precision mode. Similar to the integer operations, all register arguments
    must be the result of those operations where this option was also set.
 
    Note: memory addressing always uses 64 bit values on 64 bit systems so
-         the result of a 32 bit operation must not be used with SLJIT_MEMx
+         the result of a 32 bit operation must not be used with SLJIT2_MEMx
          macros.
 
    This option is part of the instruction name, so there is no need to
    manually set it. E.g:
 
-     SLJIT_ADD32 == (SLJIT_ADD | SLJIT_32) */
-#define SLJIT_32		0x100
+     SLJIT2_ADD32 == (SLJIT2_ADD | SLJIT2_32) */
+#define SLJIT2_32		0x100
 
 /* Many CPUs (x86, ARM, PPC) have status flag bits which can be set according
    to the result of an operation. Other CPUs (MIPS) do not have status
@@ -1071,36 +1071,36 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_return_to(struct sljit_compiler *c
 
    Note: the logical or operation can be used to set flags.
 
-   Example: SLJIT_ADD can set the Z, OVERFLOW, CARRY flags hence
+   Example: SLJIT2_ADD can set the Z, OVERFLOW, CARRY flags hence
 
-     sljit_op2(..., SLJIT_ADD, ...)
+     sljit2_op2(..., SLJIT2_ADD, ...)
        Both the zero and variable flags are undefined so they can
        have any value after the operation is completed.
 
-     sljit_op2(..., SLJIT_ADD | SLJIT_SET_Z, ...)
+     sljit2_op2(..., SLJIT2_ADD | SLJIT2_SET_Z, ...)
        Sets the zero flag if the result is zero, clears it otherwise.
        The variable flag is undefined.
 
-     sljit_op2(..., SLJIT_ADD | SLJIT_SET_OVERFLOW, ...)
+     sljit2_op2(..., SLJIT2_ADD | SLJIT2_SET_OVERFLOW, ...)
        Sets the variable flag if an integer overflow occurs, clears
        it otherwise. The zero flag is undefined.
 
-     sljit_op2(..., SLJIT_ADD | SLJIT_SET_Z | SLJIT_SET_CARRY, ...)
+     sljit2_op2(..., SLJIT2_ADD | SLJIT2_SET_Z | SLJIT2_SET_CARRY, ...)
        Sets the zero flag if the result is zero, clears it otherwise.
        Sets the variable flag if unsigned overflow (carry) occurs,
        clears it otherwise.
 
-   Certain instructions (e.g. SLJIT_MOV) does not modify flags, so
+   Certain instructions (e.g. SLJIT2_MOV) does not modify flags, so
    status flags are unchanged.
 
    Example:
 
-     sljit_op2(..., SLJIT_ADD | SLJIT_SET_Z, ...)
-     sljit_op1(..., SLJIT_MOV, ...)
-       Zero flag is set according to the result of SLJIT_ADD.
+     sljit2_op2(..., SLJIT2_ADD | SLJIT2_SET_Z, ...)
+     sljit2_op1(..., SLJIT2_MOV, ...)
+       Zero flag is set according to the result of SLJIT2_ADD.
 
-     sljit_op2(..., SLJIT_ADD | SLJIT_SET_Z, ...)
-     sljit_op2(..., SLJIT_ADD, ...)
+     sljit2_op2(..., SLJIT2_ADD | SLJIT2_SET_Z, ...)
+     sljit2_op2(..., SLJIT2_ADD, ...)
        Zero flag has unknown value.
 
    These flags can be used for code optimization. E.g. a fast loop can be
@@ -1119,78 +1119,78 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_return_to(struct sljit_compiler *c
 */
 
 /* Set Zero status flag. */
-#define SLJIT_SET_Z			0x0200
+#define SLJIT2_SET_Z			0x0200
 /* Set the variable status flag if condition is true.
-   See comparison types (e.g. SLJIT_SET_LESS, SLJIT_SET_F_EQUAL). */
-#define SLJIT_SET(condition)			((condition) << 10)
+   See comparison types (e.g. SLJIT2_SET_LESS, SLJIT2_SET_F_EQUAL). */
+#define SLJIT2_SET(condition)			((condition) << 10)
 
-/* Starting index of opcodes for sljit_emit_op0. */
-#define SLJIT_OP0_BASE			0
+/* Starting index of opcodes for sljit2_emit_op0. */
+#define SLJIT2_OP0_BASE			0
 
 /* Flags: - (does not modify flags)
    Note: breakpoint instruction is not supported by all architectures (e.g. ppc)
-         It falls back to SLJIT_NOP in those cases. */
-#define SLJIT_BREAKPOINT		(SLJIT_OP0_BASE + 0)
+         It falls back to SLJIT2_NOP in those cases. */
+#define SLJIT2_BREAKPOINT		(SLJIT2_OP0_BASE + 0)
 /* Flags: - (does not modify flags)
    Note: may or may not cause an extra cycle wait
          it can even decrease the runtime in a few cases. */
-#define SLJIT_NOP			(SLJIT_OP0_BASE + 1)
+#define SLJIT2_NOP			(SLJIT2_OP0_BASE + 1)
 /* Flags: - (may destroy flags)
-   Unsigned multiplication of SLJIT_R0 and SLJIT_R1.
-   Result is placed into SLJIT_R1:SLJIT_R0 (high:low) word */
-#define SLJIT_LMUL_UW			(SLJIT_OP0_BASE + 2)
+   Unsigned multiplication of SLJIT2_R0 and SLJIT2_R1.
+   Result is placed into SLJIT2_R1:SLJIT2_R0 (high:low) word */
+#define SLJIT2_LMUL_UW			(SLJIT2_OP0_BASE + 2)
 /* Flags: - (may destroy flags)
-   Signed multiplication of SLJIT_R0 and SLJIT_R1.
-   Result is placed into SLJIT_R1:SLJIT_R0 (high:low) word */
-#define SLJIT_LMUL_SW			(SLJIT_OP0_BASE + 3)
+   Signed multiplication of SLJIT2_R0 and SLJIT2_R1.
+   Result is placed into SLJIT2_R1:SLJIT2_R0 (high:low) word */
+#define SLJIT2_LMUL_SW			(SLJIT2_OP0_BASE + 3)
 /* Flags: - (may destroy flags)
-   Unsigned divide of the value in SLJIT_R0 by the value in SLJIT_R1.
-   The result is placed into SLJIT_R0 and the remainder into SLJIT_R1.
-   Note: if SLJIT_R1 is 0, the behaviour is undefined. */
-#define SLJIT_DIVMOD_UW			(SLJIT_OP0_BASE + 4)
-#define SLJIT_DIVMOD_U32		(SLJIT_DIVMOD_UW | SLJIT_32)
+   Unsigned divide of the value in SLJIT2_R0 by the value in SLJIT2_R1.
+   The result is placed into SLJIT2_R0 and the remainder into SLJIT2_R1.
+   Note: if SLJIT2_R1 is 0, the behaviour is undefined. */
+#define SLJIT2_DIVMOD_UW			(SLJIT2_OP0_BASE + 4)
+#define SLJIT2_DIVMOD_U32		(SLJIT2_DIVMOD_UW | SLJIT2_32)
 /* Flags: - (may destroy flags)
-   Signed divide of the value in SLJIT_R0 by the value in SLJIT_R1.
-   The result is placed into SLJIT_R0 and the remainder into SLJIT_R1.
-   Note: if SLJIT_R1 is 0, the behaviour is undefined.
-   Note: if SLJIT_R1 is -1 and SLJIT_R0 is integer min (0x800..00),
+   Signed divide of the value in SLJIT2_R0 by the value in SLJIT2_R1.
+   The result is placed into SLJIT2_R0 and the remainder into SLJIT2_R1.
+   Note: if SLJIT2_R1 is 0, the behaviour is undefined.
+   Note: if SLJIT2_R1 is -1 and SLJIT2_R0 is integer min (0x800..00),
          the behaviour is undefined. */
-#define SLJIT_DIVMOD_SW			(SLJIT_OP0_BASE + 5)
-#define SLJIT_DIVMOD_S32		(SLJIT_DIVMOD_SW | SLJIT_32)
+#define SLJIT2_DIVMOD_SW			(SLJIT2_OP0_BASE + 5)
+#define SLJIT2_DIVMOD_S32		(SLJIT2_DIVMOD_SW | SLJIT2_32)
 /* Flags: - (may destroy flags)
-   Unsigned divide of the value in SLJIT_R0 by the value in SLJIT_R1.
-   The result is placed into SLJIT_R0. SLJIT_R1 preserves its value.
-   Note: if SLJIT_R1 is 0, the behaviour is undefined. */
-#define SLJIT_DIV_UW			(SLJIT_OP0_BASE + 6)
-#define SLJIT_DIV_U32			(SLJIT_DIV_UW | SLJIT_32)
+   Unsigned divide of the value in SLJIT2_R0 by the value in SLJIT2_R1.
+   The result is placed into SLJIT2_R0. SLJIT2_R1 preserves its value.
+   Note: if SLJIT2_R1 is 0, the behaviour is undefined. */
+#define SLJIT2_DIV_UW			(SLJIT2_OP0_BASE + 6)
+#define SLJIT2_DIV_U32			(SLJIT2_DIV_UW | SLJIT2_32)
 /* Flags: - (may destroy flags)
-   Signed divide of the value in SLJIT_R0 by the value in SLJIT_R1.
-   The result is placed into SLJIT_R0. SLJIT_R1 preserves its value.
-   Note: if SLJIT_R1 is 0, the behaviour is undefined.
-   Note: if SLJIT_R1 is -1 and SLJIT_R0 is integer min (0x800..00),
+   Signed divide of the value in SLJIT2_R0 by the value in SLJIT2_R1.
+   The result is placed into SLJIT2_R0. SLJIT2_R1 preserves its value.
+   Note: if SLJIT2_R1 is 0, the behaviour is undefined.
+   Note: if SLJIT2_R1 is -1 and SLJIT2_R0 is integer min (0x800..00),
          the behaviour is undefined. */
-#define SLJIT_DIV_SW			(SLJIT_OP0_BASE + 7)
-#define SLJIT_DIV_S32			(SLJIT_DIV_SW | SLJIT_32)
+#define SLJIT2_DIV_SW			(SLJIT2_OP0_BASE + 7)
+#define SLJIT2_DIV_S32			(SLJIT2_DIV_SW | SLJIT2_32)
 /* Flags: - (does not modify flags)
-   May return with SLJIT_ERR_UNSUPPORTED if SLJIT_HAS_MEMORY_BARRIER
-   feature is not supported (calling sljit_has_cpu_feature() with
+   May return with SLJIT2_ERR_UNSUPPORTED if SLJIT2_HAS_MEMORY_BARRIER
+   feature is not supported (calling sljit2_has_cpu_feature() with
    this feature option returns with 0). */
-#define SLJIT_MEMORY_BARRIER		(SLJIT_OP0_BASE + 8)
+#define SLJIT2_MEMORY_BARRIER		(SLJIT2_OP0_BASE + 8)
 /* Flags: - (does not modify flags)
    ENDBR32 instruction for x86-32 and ENDBR64 instruction for x86-64
    when Intel Control-flow Enforcement Technology (CET) is enabled.
    No instructions are emitted for other architectures. */
-#define SLJIT_ENDBR			(SLJIT_OP0_BASE + 9)
+#define SLJIT2_ENDBR			(SLJIT2_OP0_BASE + 9)
 /* Flags: - (may destroy flags)
    Skip stack frames before return when Intel Control-flow
    Enforcement Technology (CET) is enabled. No instructions
    are emitted for other architectures. */
-#define SLJIT_SKIP_FRAMES_BEFORE_RETURN	(SLJIT_OP0_BASE + 10)
+#define SLJIT2_SKIP_FRAMES_BEFORE_RETURN	(SLJIT2_OP0_BASE + 10)
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op0(struct sljit_compiler *compiler, sljit_s32 op);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_op0(struct sljit2_compiler *compiler, sljit2_s32 op);
 
-/* Starting index of opcodes for sljit_emit_op1. */
-#define SLJIT_OP1_BASE			32
+/* Starting index of opcodes for sljit2_emit_op1. */
+#define SLJIT2_OP1_BASE			32
 
 /* The MOV instruction transfers data from source to destination.
 
@@ -1202,185 +1202,185 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op0(struct sljit_compiler *compile
    S16 - signed 16 bit data transfer
    U32 - unsigned int (32 bit) data transfer
    S32 - signed int (32 bit) data transfer
-   P   - pointer (sljit_up) data transfer
+   P   - pointer (sljit2_up) data transfer
 */
 
 /* Flags: - (does not modify flags) */
-#define SLJIT_MOV			(SLJIT_OP1_BASE + 0)
+#define SLJIT2_MOV			(SLJIT2_OP1_BASE + 0)
 /* Flags: - (does not modify flags) */
-#define SLJIT_MOV_U8			(SLJIT_OP1_BASE + 1)
-#define SLJIT_MOV32_U8			(SLJIT_MOV_U8 | SLJIT_32)
+#define SLJIT2_MOV_U8			(SLJIT2_OP1_BASE + 1)
+#define SLJIT2_MOV32_U8			(SLJIT2_MOV_U8 | SLJIT2_32)
 /* Flags: - (does not modify flags) */
-#define SLJIT_MOV_S8			(SLJIT_OP1_BASE + 2)
-#define SLJIT_MOV32_S8			(SLJIT_MOV_S8 | SLJIT_32)
+#define SLJIT2_MOV_S8			(SLJIT2_OP1_BASE + 2)
+#define SLJIT2_MOV32_S8			(SLJIT2_MOV_S8 | SLJIT2_32)
 /* Flags: - (does not modify flags) */
-#define SLJIT_MOV_U16			(SLJIT_OP1_BASE + 3)
-#define SLJIT_MOV32_U16			(SLJIT_MOV_U16 | SLJIT_32)
+#define SLJIT2_MOV_U16			(SLJIT2_OP1_BASE + 3)
+#define SLJIT2_MOV32_U16			(SLJIT2_MOV_U16 | SLJIT2_32)
 /* Flags: - (does not modify flags) */
-#define SLJIT_MOV_S16			(SLJIT_OP1_BASE + 4)
-#define SLJIT_MOV32_S16			(SLJIT_MOV_S16 | SLJIT_32)
+#define SLJIT2_MOV_S16			(SLJIT2_OP1_BASE + 4)
+#define SLJIT2_MOV32_S16			(SLJIT2_MOV_S16 | SLJIT2_32)
 /* Flags: - (does not modify flags)
-   Note: no SLJIT_MOV32_U32 form, since it is the same as SLJIT_MOV32 */
-#define SLJIT_MOV_U32			(SLJIT_OP1_BASE + 5)
+   Note: no SLJIT2_MOV32_U32 form, since it is the same as SLJIT2_MOV32 */
+#define SLJIT2_MOV_U32			(SLJIT2_OP1_BASE + 5)
 /* Flags: - (does not modify flags)
-   Note: no SLJIT_MOV32_S32 form, since it is the same as SLJIT_MOV32 */
-#define SLJIT_MOV_S32			(SLJIT_OP1_BASE + 6)
+   Note: no SLJIT2_MOV32_S32 form, since it is the same as SLJIT2_MOV32 */
+#define SLJIT2_MOV_S32			(SLJIT2_OP1_BASE + 6)
 /* Flags: - (does not modify flags) */
-#define SLJIT_MOV32			(SLJIT_OP1_BASE + 7)
+#define SLJIT2_MOV32			(SLJIT2_OP1_BASE + 7)
 /* Flags: - (does not modify flags)
    Note: loads a pointer sized data, useful on x32 mode (a 64 bit mode
          on x86-64 which uses 32 bit pointers) or similar compiling modes */
-#define SLJIT_MOV_P			(SLJIT_OP1_BASE + 8)
+#define SLJIT2_MOV_P			(SLJIT2_OP1_BASE + 8)
 /* Count leading zeroes
    Flags: - (may destroy flags)
    Note: immediate source argument is not supported */
-#define SLJIT_CLZ			(SLJIT_OP1_BASE + 9)
-#define SLJIT_CLZ32			(SLJIT_CLZ | SLJIT_32)
+#define SLJIT2_CLZ			(SLJIT2_OP1_BASE + 9)
+#define SLJIT2_CLZ32			(SLJIT2_CLZ | SLJIT2_32)
 /* Count trailing zeroes
    Flags: - (may destroy flags)
    Note: immediate source argument is not supported */
-#define SLJIT_CTZ			(SLJIT_OP1_BASE + 10)
-#define SLJIT_CTZ32			(SLJIT_CTZ | SLJIT_32)
+#define SLJIT2_CTZ			(SLJIT2_OP1_BASE + 10)
+#define SLJIT2_CTZ32			(SLJIT2_CTZ | SLJIT2_32)
 /* Reverse the order of bytes
    Flags: - (may destroy flags)
    Note: converts between little and big endian formats
    Note: immediate source argument is not supported */
-#define SLJIT_REV			(SLJIT_OP1_BASE + 11)
-#define SLJIT_REV32			(SLJIT_REV | SLJIT_32)
+#define SLJIT2_REV			(SLJIT2_OP1_BASE + 11)
+#define SLJIT2_REV32			(SLJIT2_REV | SLJIT2_32)
 /* Reverse the order of bytes in the lower 16 bit and extend as unsigned
    Flags: - (may destroy flags)
    Note: converts between little and big endian formats
    Note: immediate source argument is not supported */
-#define SLJIT_REV_U16			(SLJIT_OP1_BASE + 12)
-#define SLJIT_REV32_U16			(SLJIT_REV_U16 | SLJIT_32)
+#define SLJIT2_REV_U16			(SLJIT2_OP1_BASE + 12)
+#define SLJIT2_REV32_U16			(SLJIT2_REV_U16 | SLJIT2_32)
 /* Reverse the order of bytes in the lower 16 bit and extend as signed
    Flags: - (may destroy flags)
    Note: converts between little and big endian formats
    Note: immediate source argument is not supported */
-#define SLJIT_REV_S16			(SLJIT_OP1_BASE + 13)
-#define SLJIT_REV32_S16			(SLJIT_REV_S16 | SLJIT_32)
+#define SLJIT2_REV_S16			(SLJIT2_OP1_BASE + 13)
+#define SLJIT2_REV32_S16			(SLJIT2_REV_S16 | SLJIT2_32)
 /* Reverse the order of bytes in the lower 32 bit and extend as unsigned
    Flags: - (may destroy flags)
    Note: converts between little and big endian formats
    Note: immediate source argument is not supported */
-#define SLJIT_REV_U32			(SLJIT_OP1_BASE + 14)
+#define SLJIT2_REV_U32			(SLJIT2_OP1_BASE + 14)
 /* Reverse the order of bytes in the lower 32 bit and extend as signed
    Flags: - (may destroy flags)
    Note: converts between little and big endian formats
    Note: immediate source argument is not supported */
-#define SLJIT_REV_S32			(SLJIT_OP1_BASE + 15)
+#define SLJIT2_REV_S32			(SLJIT2_OP1_BASE + 15)
 
-/* The following unary operations are supported by using sljit_emit_op2:
-     - binary not: SLJIT_XOR with immedate -1 as src1 or src2
-     - negate: SLJIT_SUB with immedate 0 as src1
+/* The following unary operations are supported by using sljit2_emit_op2:
+     - binary not: SLJIT2_XOR with immedate -1 as src1 or src2
+     - negate: SLJIT2_SUB with immedate 0 as src1
    Note: these operations are optimized by the compiler if the
      target CPU has specialized instruction forms for them. */
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op1(struct sljit_compiler *compiler, sljit_s32 op,
-	sljit_s32 dst, sljit_sw dstw,
-	sljit_s32 src, sljit_sw srcw);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_op1(struct sljit2_compiler *compiler, sljit2_s32 op,
+	sljit2_s32 dst, sljit2_sw dstw,
+	sljit2_s32 src, sljit2_sw srcw);
 
-/* Starting index of opcodes for sljit_emit_op2. */
-#define SLJIT_OP2_BASE			64
+/* Starting index of opcodes for sljit2_emit_op2. */
+#define SLJIT2_OP2_BASE			64
 
 /* Flags: Z | OVERFLOW | CARRY */
-#define SLJIT_ADD			(SLJIT_OP2_BASE + 0)
-#define SLJIT_ADD32			(SLJIT_ADD | SLJIT_32)
+#define SLJIT2_ADD			(SLJIT2_OP2_BASE + 0)
+#define SLJIT2_ADD32			(SLJIT2_ADD | SLJIT2_32)
 /* Flags: CARRY */
-#define SLJIT_ADDC			(SLJIT_OP2_BASE + 1)
-#define SLJIT_ADDC32			(SLJIT_ADDC | SLJIT_32)
+#define SLJIT2_ADDC			(SLJIT2_OP2_BASE + 1)
+#define SLJIT2_ADDC32			(SLJIT2_ADDC | SLJIT2_32)
 /* Flags: Z | LESS | GREATER_EQUAL | GREATER | LESS_EQUAL
           SIG_LESS | SIG_GREATER_EQUAL | SIG_GREATER
           SIG_LESS_EQUAL | OVERFLOW | CARRY */
-#define SLJIT_SUB			(SLJIT_OP2_BASE + 2)
-#define SLJIT_SUB32			(SLJIT_SUB | SLJIT_32)
+#define SLJIT2_SUB			(SLJIT2_OP2_BASE + 2)
+#define SLJIT2_SUB32			(SLJIT2_SUB | SLJIT2_32)
 /* Flags: CARRY */
-#define SLJIT_SUBC			(SLJIT_OP2_BASE + 3)
-#define SLJIT_SUBC32			(SLJIT_SUBC | SLJIT_32)
+#define SLJIT2_SUBC			(SLJIT2_OP2_BASE + 3)
+#define SLJIT2_SUBC32			(SLJIT2_SUBC | SLJIT2_32)
 /* Note: integer mul
    Flags: OVERFLOW */
-#define SLJIT_MUL			(SLJIT_OP2_BASE + 4)
-#define SLJIT_MUL32			(SLJIT_MUL | SLJIT_32)
+#define SLJIT2_MUL			(SLJIT2_OP2_BASE + 4)
+#define SLJIT2_MUL32			(SLJIT2_MUL | SLJIT2_32)
 /* Flags: Z */
-#define SLJIT_AND			(SLJIT_OP2_BASE + 5)
-#define SLJIT_AND32			(SLJIT_AND | SLJIT_32)
+#define SLJIT2_AND			(SLJIT2_OP2_BASE + 5)
+#define SLJIT2_AND32			(SLJIT2_AND | SLJIT2_32)
 /* Flags: Z */
-#define SLJIT_OR			(SLJIT_OP2_BASE + 6)
-#define SLJIT_OR32			(SLJIT_OR | SLJIT_32)
+#define SLJIT2_OR			(SLJIT2_OP2_BASE + 6)
+#define SLJIT2_OR32			(SLJIT2_OR | SLJIT2_32)
 /* Flags: Z */
-#define SLJIT_XOR			(SLJIT_OP2_BASE + 7)
-#define SLJIT_XOR32			(SLJIT_XOR | SLJIT_32)
+#define SLJIT2_XOR			(SLJIT2_OP2_BASE + 7)
+#define SLJIT2_XOR32			(SLJIT2_XOR | SLJIT2_32)
 /* Flags: Z
    Let bit_length be the length of the shift operation: 32 or 64.
    If src2 is immediate, src2w is masked by (bit_length - 1).
    Otherwise, if the content of src2 is outside the range from 0
    to bit_length - 1, the result is undefined. */
-#define SLJIT_SHL			(SLJIT_OP2_BASE + 8)
-#define SLJIT_SHL32			(SLJIT_SHL | SLJIT_32)
+#define SLJIT2_SHL			(SLJIT2_OP2_BASE + 8)
+#define SLJIT2_SHL32			(SLJIT2_SHL | SLJIT2_32)
 /* Flags: Z
-   Same as SLJIT_SHL, except the the second operand is
+   Same as SLJIT2_SHL, except the the second operand is
    always masked by the length of the shift operation. */
-#define SLJIT_MSHL			(SLJIT_OP2_BASE + 9)
-#define SLJIT_MSHL32			(SLJIT_MSHL | SLJIT_32)
+#define SLJIT2_MSHL			(SLJIT2_OP2_BASE + 9)
+#define SLJIT2_MSHL32			(SLJIT2_MSHL | SLJIT2_32)
 /* Flags: Z
    Let bit_length be the length of the shift operation: 32 or 64.
    If src2 is immediate, src2w is masked by (bit_length - 1).
    Otherwise, if the content of src2 is outside the range from 0
    to bit_length - 1, the result is undefined. */
-#define SLJIT_LSHR			(SLJIT_OP2_BASE + 10)
-#define SLJIT_LSHR32			(SLJIT_LSHR | SLJIT_32)
+#define SLJIT2_LSHR			(SLJIT2_OP2_BASE + 10)
+#define SLJIT2_LSHR32			(SLJIT2_LSHR | SLJIT2_32)
 /* Flags: Z
-   Same as SLJIT_LSHR, except the the second operand is
+   Same as SLJIT2_LSHR, except the the second operand is
    always masked by the length of the shift operation. */
-#define SLJIT_MLSHR			(SLJIT_OP2_BASE + 11)
-#define SLJIT_MLSHR32			(SLJIT_MLSHR | SLJIT_32)
+#define SLJIT2_MLSHR			(SLJIT2_OP2_BASE + 11)
+#define SLJIT2_MLSHR32			(SLJIT2_MLSHR | SLJIT2_32)
 /* Flags: Z
    Let bit_length be the length of the shift operation: 32 or 64.
    If src2 is immediate, src2w is masked by (bit_length - 1).
    Otherwise, if the content of src2 is outside the range from 0
    to bit_length - 1, the result is undefined. */
-#define SLJIT_ASHR			(SLJIT_OP2_BASE + 12)
-#define SLJIT_ASHR32			(SLJIT_ASHR | SLJIT_32)
+#define SLJIT2_ASHR			(SLJIT2_OP2_BASE + 12)
+#define SLJIT2_ASHR32			(SLJIT2_ASHR | SLJIT2_32)
 /* Flags: Z
-   Same as SLJIT_ASHR, except the the second operand is
+   Same as SLJIT2_ASHR, except the the second operand is
    always masked by the length of the shift operation. */
-#define SLJIT_MASHR			(SLJIT_OP2_BASE + 13)
-#define SLJIT_MASHR32			(SLJIT_MASHR | SLJIT_32)
+#define SLJIT2_MASHR			(SLJIT2_OP2_BASE + 13)
+#define SLJIT2_MASHR32			(SLJIT2_MASHR | SLJIT2_32)
 /* Flags: - (may destroy flags)
    Let bit_length be the length of the rotate operation: 32 or 64.
    The second operand is always masked by (bit_length - 1). */
-#define SLJIT_ROTL			(SLJIT_OP2_BASE + 14)
-#define SLJIT_ROTL32			(SLJIT_ROTL | SLJIT_32)
+#define SLJIT2_ROTL			(SLJIT2_OP2_BASE + 14)
+#define SLJIT2_ROTL32			(SLJIT2_ROTL | SLJIT2_32)
 /* Flags: - (may destroy flags)
    Let bit_length be the length of the rotate operation: 32 or 64.
    The second operand is always masked by (bit_length - 1). */
-#define SLJIT_ROTR			(SLJIT_OP2_BASE + 15)
-#define SLJIT_ROTR32			(SLJIT_ROTR | SLJIT_32)
+#define SLJIT2_ROTR			(SLJIT2_OP2_BASE + 15)
+#define SLJIT2_ROTR32			(SLJIT2_ROTR | SLJIT2_32)
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op2(struct sljit_compiler *compiler, sljit_s32 op,
-	sljit_s32 dst, sljit_sw dstw,
-	sljit_s32 src1, sljit_sw src1w,
-	sljit_s32 src2, sljit_sw src2w);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_op2(struct sljit2_compiler *compiler, sljit2_s32 op,
+	sljit2_s32 dst, sljit2_sw dstw,
+	sljit2_s32 src1, sljit2_sw src1w,
+	sljit2_s32 src2, sljit2_sw src2w);
 
-/* The sljit_emit_op2u function is the same as sljit_emit_op2
+/* The sljit2_emit_op2u function is the same as sljit2_emit_op2
    except the result is discarded. */
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op2u(struct sljit_compiler *compiler, sljit_s32 op,
-	sljit_s32 src1, sljit_sw src1w,
-	sljit_s32 src2, sljit_sw src2w);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_op2u(struct sljit2_compiler *compiler, sljit2_s32 op,
+	sljit2_s32 src1, sljit2_sw src1w,
+	sljit2_s32 src2, sljit2_sw src2w);
 
-/* Starting index of opcodes for sljit_emit_op2r. */
-#define SLJIT_OP2R_BASE			96
+/* Starting index of opcodes for sljit2_emit_op2r. */
+#define SLJIT2_OP2R_BASE			96
 
 /* Flags: - (may destroy flags) */
-#define SLJIT_MULADD			(SLJIT_OP2R_BASE + 0)
-#define SLJIT_MULADD32			(SLJIT_MULADD | SLJIT_32)
+#define SLJIT2_MULADD			(SLJIT2_OP2R_BASE + 0)
+#define SLJIT2_MULADD32			(SLJIT2_MULADD | SLJIT2_32)
 
-/* Similar to sljit_emit_fop2, except the destination is always a register. */
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op2r(struct sljit_compiler *compiler, sljit_s32 op,
-	sljit_s32 dst_reg,
-	sljit_s32 src1, sljit_sw src1w,
-	sljit_s32 src2, sljit_sw src2w);
+/* Similar to sljit2_emit_fop2, except the destination is always a register. */
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_op2r(struct sljit2_compiler *compiler, sljit2_s32 op,
+	sljit2_s32 dst_reg,
+	sljit2_s32 src1, sljit2_sw src1w,
+	sljit2_s32 src2, sljit2_sw src2w);
 
 /* Emit a left or right shift operation, where the bits shifted
    in comes from a separate source operand. All operands are
@@ -1390,20 +1390,20 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op2r(struct sljit_compiler *compil
      operations and word_size - 1 otherwise.
 
    op must be one of the following operations:
-     SLJIT_SHL or SLJIT_SHL32:
+     SLJIT2_SHL or SLJIT2_SHL32:
        dst_reg = src1_reg << src3_reg
        dst_reg |= ((src2_reg >> 1) >> (src3 ^ value_mask))
-     SLJIT_MSHL or SLJIT_MSHL32:
+     SLJIT2_MSHL or SLJIT2_MSHL32:
        src3 &= value_mask
-       perform the SLJIT_SHL or SLJIT_SHL32 operation
-     SLJIT_LSHR or SLJIT_LSHR32:
+       perform the SLJIT2_SHL or SLJIT2_SHL32 operation
+     SLJIT2_LSHR or SLJIT2_LSHR32:
        dst_reg = src1_reg >> src3_reg
        dst_reg |= ((src2_reg << 1) << (src3 ^ value_mask))
-     SLJIT_MLSHR or SLJIT_MLSHR32:
+     SLJIT2_MLSHR or SLJIT2_MLSHR32:
        src3 &= value_mask
-       perform the SLJIT_LSHR or SLJIT_LSHR32 operation
+       perform the SLJIT2_LSHR or SLJIT2_LSHR32 operation
 
-   op can be combined (or'ed) with SLJIT_SHIFT_INTO_NON_ZERO
+   op can be combined (or'ed) with SLJIT2_SHIFT_INTO_NON_ZERO
 
    dst_reg specifies the destination register, where dst_reg
      and src2_reg cannot be the same registers
@@ -1419,154 +1419,154 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op2r(struct sljit_compiler *compil
 /* The src3 operand contains a non-zero value. Improves
    the generated code on certain architectures, which
    provides a small performance improvement. */
-#define SLJIT_SHIFT_INTO_NON_ZERO	0x200
+#define SLJIT2_SHIFT_INTO_NON_ZERO	0x200
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_shift_into(struct sljit_compiler *compiler, sljit_s32 op,
-	sljit_s32 dst_reg,
-	sljit_s32 src1_reg,
-	sljit_s32 src2_reg,
-	sljit_s32 src3, sljit_sw src3w);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_shift_into(struct sljit2_compiler *compiler, sljit2_s32 op,
+	sljit2_s32 dst_reg,
+	sljit2_s32 src1_reg,
+	sljit2_s32 src2_reg,
+	sljit2_s32 src3, sljit2_sw src3w);
 
-/* Starting index of opcodes for sljit_emit_op_src
-   and sljit_emit_op_dst. */
-#define SLJIT_OP_SRC_DST_BASE		112
+/* Starting index of opcodes for sljit2_emit_op_src
+   and sljit2_emit_op_dst. */
+#define SLJIT2_OP_SRC_DST_BASE		112
 
-/* Fast return, see SLJIT_FAST_CALL for more details.
+/* Fast return, see SLJIT2_FAST_CALL for more details.
    Note: src cannot be an immedate value
    Flags: - (does not modify flags) */
-#define SLJIT_FAST_RETURN		(SLJIT_OP_SRC_DST_BASE + 0)
+#define SLJIT2_FAST_RETURN		(SLJIT2_OP_SRC_DST_BASE + 0)
 /* Skip stack frames before fast return.
    Note: src cannot be an immedate value
    Flags: may destroy flags. */
-#define SLJIT_SKIP_FRAMES_BEFORE_FAST_RETURN	(SLJIT_OP_SRC_DST_BASE + 1)
+#define SLJIT2_SKIP_FRAMES_BEFORE_FAST_RETURN	(SLJIT2_OP_SRC_DST_BASE + 1)
 /* Prefetch value into the level 1 data cache
    Note: if the target CPU does not support data prefetch,
          no instructions are emitted.
    Note: this instruction never fails, even if the memory address is invalid.
    Flags: - (does not modify flags) */
-#define SLJIT_PREFETCH_L1		(SLJIT_OP_SRC_DST_BASE + 2)
+#define SLJIT2_PREFETCH_L1		(SLJIT2_OP_SRC_DST_BASE + 2)
 /* Prefetch value into the level 2 data cache
-   Note: same as SLJIT_PREFETCH_L1 if the target CPU
+   Note: same as SLJIT2_PREFETCH_L1 if the target CPU
          does not support this instruction form.
    Note: this instruction never fails, even if the memory address is invalid.
    Flags: - (does not modify flags) */
-#define SLJIT_PREFETCH_L2		(SLJIT_OP_SRC_DST_BASE + 3)
+#define SLJIT2_PREFETCH_L2		(SLJIT2_OP_SRC_DST_BASE + 3)
 /* Prefetch value into the level 3 data cache
-   Note: same as SLJIT_PREFETCH_L2 if the target CPU
+   Note: same as SLJIT2_PREFETCH_L2 if the target CPU
          does not support this instruction form.
    Note: this instruction never fails, even if the memory address is invalid.
    Flags: - (does not modify flags) */
-#define SLJIT_PREFETCH_L3		(SLJIT_OP_SRC_DST_BASE + 4)
+#define SLJIT2_PREFETCH_L3		(SLJIT2_OP_SRC_DST_BASE + 4)
 /* Prefetch a value which is only used once (and can be discarded afterwards)
-   Note: same as SLJIT_PREFETCH_L1 if the target CPU
+   Note: same as SLJIT2_PREFETCH_L1 if the target CPU
          does not support this instruction form.
    Note: this instruction never fails, even if the memory address is invalid.
    Flags: - (does not modify flags) */
-#define SLJIT_PREFETCH_ONCE		(SLJIT_OP_SRC_DST_BASE + 5)
+#define SLJIT2_PREFETCH_ONCE		(SLJIT2_OP_SRC_DST_BASE + 5)
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op_src(struct sljit_compiler *compiler, sljit_s32 op,
-	sljit_s32 src, sljit_sw srcw);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_op_src(struct sljit2_compiler *compiler, sljit2_s32 op,
+	sljit2_s32 src, sljit2_sw srcw);
 
-/* Fast enter, see SLJIT_FAST_CALL for more details.
+/* Fast enter, see SLJIT2_FAST_CALL for more details.
    Flags: - (does not modify flags) */
-#define SLJIT_FAST_ENTER		(SLJIT_OP_SRC_DST_BASE + 6)
+#define SLJIT2_FAST_ENTER		(SLJIT2_OP_SRC_DST_BASE + 6)
 
 /* Copies the return address into dst. The return address is the
    address where the execution continues after the called function
-   returns (see: sljit_emit_return / sljit_emit_return_void).
+   returns (see: sljit2_emit_return / sljit2_emit_return_void).
    Flags: - (does not modify flags) */
-#define SLJIT_GET_RETURN_ADDRESS	(SLJIT_OP_SRC_DST_BASE + 7)
+#define SLJIT2_GET_RETURN_ADDRESS	(SLJIT2_OP_SRC_DST_BASE + 7)
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op_dst(struct sljit_compiler *compiler, sljit_s32 op,
-	sljit_s32 dst, sljit_sw dstw);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_op_dst(struct sljit2_compiler *compiler, sljit2_s32 op,
+	sljit2_s32 dst, sljit2_sw dstw);
 
-/* Starting index of opcodes for sljit_emit_fop1. */
-#define SLJIT_FOP1_BASE			144
+/* Starting index of opcodes for sljit2_emit_fop1. */
+#define SLJIT2_FOP1_BASE			144
 
 /* Flags: - (does not modify flags) */
-#define SLJIT_MOV_F64			(SLJIT_FOP1_BASE + 0)
-#define SLJIT_MOV_F32			(SLJIT_MOV_F64 | SLJIT_32)
+#define SLJIT2_MOV_F64			(SLJIT2_FOP1_BASE + 0)
+#define SLJIT2_MOV_F32			(SLJIT2_MOV_F64 | SLJIT2_32)
 /* Convert opcodes: CONV[DST_TYPE].FROM[SRC_TYPE]
    SRC/DST TYPE can be: F64, F32, S32, SW
    Rounding mode when the destination is SW or S32: round towards zero. */
 /* Flags: - (may destroy flags) */
-#define SLJIT_CONV_F64_FROM_F32		(SLJIT_FOP1_BASE + 1)
-#define SLJIT_CONV_F32_FROM_F64		(SLJIT_CONV_F64_FROM_F32 | SLJIT_32)
+#define SLJIT2_CONV_F64_FROM_F32		(SLJIT2_FOP1_BASE + 1)
+#define SLJIT2_CONV_F32_FROM_F64		(SLJIT2_CONV_F64_FROM_F32 | SLJIT2_32)
 /* Flags: - (may destroy flags) */
-#define SLJIT_CONV_SW_FROM_F64		(SLJIT_FOP1_BASE + 2)
-#define SLJIT_CONV_SW_FROM_F32		(SLJIT_CONV_SW_FROM_F64 | SLJIT_32)
+#define SLJIT2_CONV_SW_FROM_F64		(SLJIT2_FOP1_BASE + 2)
+#define SLJIT2_CONV_SW_FROM_F32		(SLJIT2_CONV_SW_FROM_F64 | SLJIT2_32)
 /* Flags: - (may destroy flags) */
-#define SLJIT_CONV_S32_FROM_F64		(SLJIT_FOP1_BASE + 3)
-#define SLJIT_CONV_S32_FROM_F32		(SLJIT_CONV_S32_FROM_F64 | SLJIT_32)
+#define SLJIT2_CONV_S32_FROM_F64		(SLJIT2_FOP1_BASE + 3)
+#define SLJIT2_CONV_S32_FROM_F32		(SLJIT2_CONV_S32_FROM_F64 | SLJIT2_32)
 /* Flags: - (may destroy flags) */
-#define SLJIT_CONV_F64_FROM_SW		(SLJIT_FOP1_BASE + 4)
-#define SLJIT_CONV_F32_FROM_SW		(SLJIT_CONV_F64_FROM_SW | SLJIT_32)
+#define SLJIT2_CONV_F64_FROM_SW		(SLJIT2_FOP1_BASE + 4)
+#define SLJIT2_CONV_F32_FROM_SW		(SLJIT2_CONV_F64_FROM_SW | SLJIT2_32)
 /* Flags: - (may destroy flags) */
-#define SLJIT_CONV_F64_FROM_S32		(SLJIT_FOP1_BASE + 5)
-#define SLJIT_CONV_F32_FROM_S32		(SLJIT_CONV_F64_FROM_S32 | SLJIT_32)
+#define SLJIT2_CONV_F64_FROM_S32		(SLJIT2_FOP1_BASE + 5)
+#define SLJIT2_CONV_F32_FROM_S32		(SLJIT2_CONV_F64_FROM_S32 | SLJIT2_32)
 /* Flags: - (may destroy flags) */
-#define SLJIT_CONV_F64_FROM_UW		(SLJIT_FOP1_BASE + 6)
-#define SLJIT_CONV_F32_FROM_UW		(SLJIT_CONV_F64_FROM_UW | SLJIT_32)
+#define SLJIT2_CONV_F64_FROM_UW		(SLJIT2_FOP1_BASE + 6)
+#define SLJIT2_CONV_F32_FROM_UW		(SLJIT2_CONV_F64_FROM_UW | SLJIT2_32)
 /* Flags: - (may destroy flags) */
-#define SLJIT_CONV_F64_FROM_U32		(SLJIT_FOP1_BASE + 7)
-#define SLJIT_CONV_F32_FROM_U32		(SLJIT_CONV_F64_FROM_U32 | SLJIT_32)
-/* Note: dst is the left and src is the right operand for SLJIT_CMP_F32/64.
+#define SLJIT2_CONV_F64_FROM_U32		(SLJIT2_FOP1_BASE + 7)
+#define SLJIT2_CONV_F32_FROM_U32		(SLJIT2_CONV_F64_FROM_U32 | SLJIT2_32)
+/* Note: dst is the left and src is the right operand for SLJIT2_CMP_F32/64.
    Flags: EQUAL_F | LESS_F | GREATER_EQUAL_F | GREATER_F | LESS_EQUAL_F */
-#define SLJIT_CMP_F64			(SLJIT_FOP1_BASE + 8)
-#define SLJIT_CMP_F32			(SLJIT_CMP_F64 | SLJIT_32)
+#define SLJIT2_CMP_F64			(SLJIT2_FOP1_BASE + 8)
+#define SLJIT2_CMP_F32			(SLJIT2_CMP_F64 | SLJIT2_32)
 /* Flags: - (may destroy flags) */
-#define SLJIT_NEG_F64			(SLJIT_FOP1_BASE + 9)
-#define SLJIT_NEG_F32			(SLJIT_NEG_F64 | SLJIT_32)
+#define SLJIT2_NEG_F64			(SLJIT2_FOP1_BASE + 9)
+#define SLJIT2_NEG_F32			(SLJIT2_NEG_F64 | SLJIT2_32)
 /* Flags: - (may destroy flags) */
-#define SLJIT_ABS_F64			(SLJIT_FOP1_BASE + 10)
-#define SLJIT_ABS_F32			(SLJIT_ABS_F64 | SLJIT_32)
+#define SLJIT2_ABS_F64			(SLJIT2_FOP1_BASE + 10)
+#define SLJIT2_ABS_F32			(SLJIT2_ABS_F64 | SLJIT2_32)
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fop1(struct sljit_compiler *compiler, sljit_s32 op,
-	sljit_s32 dst, sljit_sw dstw,
-	sljit_s32 src, sljit_sw srcw);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_fop1(struct sljit2_compiler *compiler, sljit2_s32 op,
+	sljit2_s32 dst, sljit2_sw dstw,
+	sljit2_s32 src, sljit2_sw srcw);
 
-/* Starting index of opcodes for sljit_emit_fop2. */
-#define SLJIT_FOP2_BASE			176
-
-/* Flags: - (may destroy flags) */
-#define SLJIT_ADD_F64			(SLJIT_FOP2_BASE + 0)
-#define SLJIT_ADD_F32			(SLJIT_ADD_F64 | SLJIT_32)
-/* Flags: - (may destroy flags) */
-#define SLJIT_SUB_F64			(SLJIT_FOP2_BASE + 1)
-#define SLJIT_SUB_F32			(SLJIT_SUB_F64 | SLJIT_32)
-/* Flags: - (may destroy flags) */
-#define SLJIT_MUL_F64			(SLJIT_FOP2_BASE + 2)
-#define SLJIT_MUL_F32			(SLJIT_MUL_F64 | SLJIT_32)
-/* Flags: - (may destroy flags) */
-#define SLJIT_DIV_F64			(SLJIT_FOP2_BASE + 3)
-#define SLJIT_DIV_F32			(SLJIT_DIV_F64 | SLJIT_32)
-
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fop2(struct sljit_compiler *compiler, sljit_s32 op,
-	sljit_s32 dst, sljit_sw dstw,
-	sljit_s32 src1, sljit_sw src1w,
-	sljit_s32 src2, sljit_sw src2w);
-
-/* Starting index of opcodes for sljit_emit_fop2r. */
-#define SLJIT_FOP2R_BASE		192
+/* Starting index of opcodes for sljit2_emit_fop2. */
+#define SLJIT2_FOP2_BASE			176
 
 /* Flags: - (may destroy flags) */
-#define SLJIT_COPYSIGN_F64		(SLJIT_FOP2R_BASE + 0)
-#define SLJIT_COPYSIGN_F32		(SLJIT_COPYSIGN_F64 | SLJIT_32)
+#define SLJIT2_ADD_F64			(SLJIT2_FOP2_BASE + 0)
+#define SLJIT2_ADD_F32			(SLJIT2_ADD_F64 | SLJIT2_32)
+/* Flags: - (may destroy flags) */
+#define SLJIT2_SUB_F64			(SLJIT2_FOP2_BASE + 1)
+#define SLJIT2_SUB_F32			(SLJIT2_SUB_F64 | SLJIT2_32)
+/* Flags: - (may destroy flags) */
+#define SLJIT2_MUL_F64			(SLJIT2_FOP2_BASE + 2)
+#define SLJIT2_MUL_F32			(SLJIT2_MUL_F64 | SLJIT2_32)
+/* Flags: - (may destroy flags) */
+#define SLJIT2_DIV_F64			(SLJIT2_FOP2_BASE + 3)
+#define SLJIT2_DIV_F32			(SLJIT2_DIV_F64 | SLJIT2_32)
 
-/* Similar to sljit_emit_fop2, except the destination is always a register. */
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fop2r(struct sljit_compiler *compiler, sljit_s32 op,
-	sljit_s32 dst_freg,
-	sljit_s32 src1, sljit_sw src1w,
-	sljit_s32 src2, sljit_sw src2w);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_fop2(struct sljit2_compiler *compiler, sljit2_s32 op,
+	sljit2_s32 dst, sljit2_sw dstw,
+	sljit2_s32 src1, sljit2_sw src1w,
+	sljit2_s32 src2, sljit2_sw src2w);
+
+/* Starting index of opcodes for sljit2_emit_fop2r. */
+#define SLJIT2_FOP2R_BASE		192
+
+/* Flags: - (may destroy flags) */
+#define SLJIT2_COPYSIGN_F64		(SLJIT2_FOP2R_BASE + 0)
+#define SLJIT2_COPYSIGN_F32		(SLJIT2_COPYSIGN_F64 | SLJIT2_32)
+
+/* Similar to sljit2_emit_fop2, except the destination is always a register. */
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_fop2r(struct sljit2_compiler *compiler, sljit2_s32 op,
+	sljit2_s32 dst_freg,
+	sljit2_s32 src1, sljit2_sw src1w,
+	sljit2_s32 src2, sljit2_sw src2w);
 
 /* Sets a floating point register to an immediate value. */
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fset32(struct sljit_compiler *compiler,
-	sljit_s32 freg, sljit_f32 value);
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fset64(struct sljit_compiler *compiler,
-	sljit_s32 freg, sljit_f64 value);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_fset32(struct sljit2_compiler *compiler,
+	sljit2_s32 freg, sljit2_f32 value);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_fset64(struct sljit2_compiler *compiler,
+	sljit2_s32 freg, sljit2_f64 value);
 
-/* The following opcodes are used by sljit_emit_fcopy(). */
+/* The following opcodes are used by sljit2_emit_fcopy(). */
 
 /* 64 bit: copy a 64 bit value from an integer register into a
            64 bit floating point register without any modifications.
@@ -1577,10 +1577,10 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fset64(struct sljit_compiler *comp
            register. If a register pair is passed, the low
            order 32 bit is replaced by the second register.
            Otherwise, the low order 32 bit is unchanged. */
-#define SLJIT_COPY_TO_F64		1
+#define SLJIT2_COPY_TO_F64		1
 /* Copy a 32 bit value from an integer register into a 32 bit
    floating point register without any modifications. */
-#define SLJIT_COPY32_TO_F32		(SLJIT_COPY_TO_F64 | SLJIT_32)
+#define SLJIT2_COPY32_TO_F32		(SLJIT2_COPY_TO_F64 | SLJIT2_32)
 /* 64 bit: copy the value of a 64 bit floating point register into
            an integer register without any modifications.
    32 bit: copy a 64 bit floating point register into a 32 bit register
@@ -1589,32 +1589,32 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fset64(struct sljit_compiler *comp
            into the register, or the first register of the register
            pair. If a register pair is passed, the low order 32 bit
            is copied into the second register. */
-#define SLJIT_COPY_FROM_F64		2
+#define SLJIT2_COPY_FROM_F64		2
 /* Copy the value of a 32 bit floating point register into an integer
    register without any modifications. The register should be processed
    with 32 bit operations later. */
-#define SLJIT_COPY32_FROM_F32		(SLJIT_COPY_FROM_F64 | SLJIT_32)
+#define SLJIT2_COPY32_FROM_F32		(SLJIT2_COPY_FROM_F64 | SLJIT2_32)
 
 /* Special data copy which involves floating point registers.
 
-  op must be between SLJIT_COPY_TO_F64 and SLJIT_COPY32_FROM_F32
+  op must be between SLJIT2_COPY_TO_F64 and SLJIT2_COPY32_FROM_F32
   freg must be a floating point register
   reg must be a register or register pair */
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fcopy(struct sljit_compiler *compiler, sljit_s32 op,
-	sljit_s32 freg, sljit_s32 reg);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_fcopy(struct sljit2_compiler *compiler, sljit2_s32 op,
+	sljit2_s32 freg, sljit2_s32 reg);
 
 /* Label and jump instructions. */
 
-SLJIT_API_FUNC_ATTRIBUTE struct sljit_label* sljit_emit_label(struct sljit_compiler *compiler);
+SLJIT2_API_FUNC_ATTRIBUTE struct sljit2_label* sljit2_emit_label(struct sljit2_compiler *compiler);
 
-/* The SLJIT_FAST_CALL is a calling method for creating lightweight function
+/* The SLJIT2_FAST_CALL is a calling method for creating lightweight function
    calls. This type of calls preserve the values of all registers and stack
    frame. Unlike normal function calls, the enter and return operations must
-   be performed by the SLJIT_FAST_ENTER and SLJIT_FAST_RETURN operations
+   be performed by the SLJIT2_FAST_ENTER and SLJIT2_FAST_RETURN operations
    respectively. The return address is stored in the dst argument of the
-   SLJIT_FAST_ENTER operation, and this return address should be passed as
-   the src argument for the SLJIT_FAST_RETURN operation to return from the
+   SLJIT2_FAST_ENTER operation, and this return address should be passed as
+   the src argument for the SLJIT2_FAST_RETURN operation to return from the
    called function.
 
    Fast calls are cheap operations (usually only a single call instruction is
@@ -1623,209 +1623,209 @@ SLJIT_API_FUNC_ATTRIBUTE struct sljit_label* sljit_emit_label(struct sljit_compi
    efficiently exploited by various optimizations. Registers can be saved
    and restored manually if needed.
 
-   Although returning to different address by SLJIT_FAST_RETURN is possible,
+   Although returning to different address by SLJIT2_FAST_RETURN is possible,
    this address usually cannot be predicted by the return address predictor of
    modern CPUs which may reduce performance. Furthermore certain security
    enhancement technologies such as Intel Control-flow Enforcement Technology
    (CET) may disallow returning to a different address (indirect jumps
-   can be used instead, see SLJIT_SKIP_FRAMES_BEFORE_FAST_RETURN). */
+   can be used instead, see SLJIT2_SKIP_FRAMES_BEFORE_FAST_RETURN). */
 
 /* Invert (negate) conditional type: xor (^) with 0x1 */
 
 /* Integer comparison types. */
-#define SLJIT_EQUAL			0
-#define SLJIT_ZERO			SLJIT_EQUAL
-#define SLJIT_NOT_EQUAL			1
-#define SLJIT_NOT_ZERO			SLJIT_NOT_EQUAL
+#define SLJIT2_EQUAL			0
+#define SLJIT2_ZERO			SLJIT2_EQUAL
+#define SLJIT2_NOT_EQUAL			1
+#define SLJIT2_NOT_ZERO			SLJIT2_NOT_EQUAL
 
-#define SLJIT_LESS			2
-#define SLJIT_SET_LESS			SLJIT_SET(SLJIT_LESS)
-#define SLJIT_GREATER_EQUAL		3
-#define SLJIT_SET_GREATER_EQUAL		SLJIT_SET(SLJIT_LESS)
-#define SLJIT_GREATER			4
-#define SLJIT_SET_GREATER		SLJIT_SET(SLJIT_GREATER)
-#define SLJIT_LESS_EQUAL		5
-#define SLJIT_SET_LESS_EQUAL		SLJIT_SET(SLJIT_GREATER)
-#define SLJIT_SIG_LESS			6
-#define SLJIT_SET_SIG_LESS		SLJIT_SET(SLJIT_SIG_LESS)
-#define SLJIT_SIG_GREATER_EQUAL		7
-#define SLJIT_SET_SIG_GREATER_EQUAL	SLJIT_SET(SLJIT_SIG_LESS)
-#define SLJIT_SIG_GREATER		8
-#define SLJIT_SET_SIG_GREATER		SLJIT_SET(SLJIT_SIG_GREATER)
-#define SLJIT_SIG_LESS_EQUAL		9
-#define SLJIT_SET_SIG_LESS_EQUAL	SLJIT_SET(SLJIT_SIG_GREATER)
+#define SLJIT2_LESS			2
+#define SLJIT2_SET_LESS			SLJIT2_SET(SLJIT2_LESS)
+#define SLJIT2_GREATER_EQUAL		3
+#define SLJIT2_SET_GREATER_EQUAL		SLJIT2_SET(SLJIT2_LESS)
+#define SLJIT2_GREATER			4
+#define SLJIT2_SET_GREATER		SLJIT2_SET(SLJIT2_GREATER)
+#define SLJIT2_LESS_EQUAL		5
+#define SLJIT2_SET_LESS_EQUAL		SLJIT2_SET(SLJIT2_GREATER)
+#define SLJIT2_SIG_LESS			6
+#define SLJIT2_SET_SIG_LESS		SLJIT2_SET(SLJIT2_SIG_LESS)
+#define SLJIT2_SIG_GREATER_EQUAL		7
+#define SLJIT2_SET_SIG_GREATER_EQUAL	SLJIT2_SET(SLJIT2_SIG_LESS)
+#define SLJIT2_SIG_GREATER		8
+#define SLJIT2_SET_SIG_GREATER		SLJIT2_SET(SLJIT2_SIG_GREATER)
+#define SLJIT2_SIG_LESS_EQUAL		9
+#define SLJIT2_SET_SIG_LESS_EQUAL	SLJIT2_SET(SLJIT2_SIG_GREATER)
 
-#define SLJIT_OVERFLOW			10
-#define SLJIT_SET_OVERFLOW		SLJIT_SET(SLJIT_OVERFLOW)
-#define SLJIT_NOT_OVERFLOW		11
+#define SLJIT2_OVERFLOW			10
+#define SLJIT2_SET_OVERFLOW		SLJIT2_SET(SLJIT2_OVERFLOW)
+#define SLJIT2_NOT_OVERFLOW		11
 
-/* Unlike other flags, sljit_emit_jump may destroy the carry flag. */
-#define SLJIT_CARRY			12
-#define SLJIT_SET_CARRY			SLJIT_SET(SLJIT_CARRY)
-#define SLJIT_NOT_CARRY			13
+/* Unlike other flags, sljit2_emit_jump may destroy the carry flag. */
+#define SLJIT2_CARRY			12
+#define SLJIT2_SET_CARRY			SLJIT2_SET(SLJIT2_CARRY)
+#define SLJIT2_NOT_CARRY			13
 
-#define SLJIT_ATOMIC_STORED		14
-#define SLJIT_SET_ATOMIC_STORED		SLJIT_SET(SLJIT_ATOMIC_STORED)
-#define SLJIT_ATOMIC_NOT_STORED		15
+#define SLJIT2_ATOMIC_STORED		14
+#define SLJIT2_SET_ATOMIC_STORED		SLJIT2_SET(SLJIT2_ATOMIC_STORED)
+#define SLJIT2_ATOMIC_NOT_STORED		15
 
 /* Basic floating point comparison types.
 
    Note: when the comparison result is unordered, their behaviour is unspecified. */
 
-#define SLJIT_F_EQUAL				16
-#define SLJIT_SET_F_EQUAL			SLJIT_SET(SLJIT_F_EQUAL)
-#define SLJIT_F_NOT_EQUAL			17
-#define SLJIT_SET_F_NOT_EQUAL			SLJIT_SET(SLJIT_F_EQUAL)
-#define SLJIT_F_LESS				18
-#define SLJIT_SET_F_LESS			SLJIT_SET(SLJIT_F_LESS)
-#define SLJIT_F_GREATER_EQUAL			19
-#define SLJIT_SET_F_GREATER_EQUAL		SLJIT_SET(SLJIT_F_LESS)
-#define SLJIT_F_GREATER				20
-#define SLJIT_SET_F_GREATER			SLJIT_SET(SLJIT_F_GREATER)
-#define SLJIT_F_LESS_EQUAL			21
-#define SLJIT_SET_F_LESS_EQUAL			SLJIT_SET(SLJIT_F_GREATER)
+#define SLJIT2_F_EQUAL				16
+#define SLJIT2_SET_F_EQUAL			SLJIT2_SET(SLJIT2_F_EQUAL)
+#define SLJIT2_F_NOT_EQUAL			17
+#define SLJIT2_SET_F_NOT_EQUAL			SLJIT2_SET(SLJIT2_F_EQUAL)
+#define SLJIT2_F_LESS				18
+#define SLJIT2_SET_F_LESS			SLJIT2_SET(SLJIT2_F_LESS)
+#define SLJIT2_F_GREATER_EQUAL			19
+#define SLJIT2_SET_F_GREATER_EQUAL		SLJIT2_SET(SLJIT2_F_LESS)
+#define SLJIT2_F_GREATER				20
+#define SLJIT2_SET_F_GREATER			SLJIT2_SET(SLJIT2_F_GREATER)
+#define SLJIT2_F_LESS_EQUAL			21
+#define SLJIT2_SET_F_LESS_EQUAL			SLJIT2_SET(SLJIT2_F_GREATER)
 
 /* Jumps when either argument contains a NaN value. */
-#define SLJIT_UNORDERED				22
-#define SLJIT_SET_UNORDERED			SLJIT_SET(SLJIT_UNORDERED)
+#define SLJIT2_UNORDERED				22
+#define SLJIT2_SET_UNORDERED			SLJIT2_SET(SLJIT2_UNORDERED)
 /* Jumps when neither argument contains a NaN value. */
-#define SLJIT_ORDERED				23
-#define SLJIT_SET_ORDERED			SLJIT_SET(SLJIT_UNORDERED)
+#define SLJIT2_ORDERED				23
+#define SLJIT2_SET_ORDERED			SLJIT2_SET(SLJIT2_UNORDERED)
 
 /* Ordered / unordered floating point comparison types.
 
    Note: each comparison type has an ordered and unordered form. Some
-         architectures supports only either of them (see: sljit_cmp_info). */
+         architectures supports only either of them (see: sljit2_cmp_info). */
 
-#define SLJIT_ORDERED_EQUAL			24
-#define SLJIT_SET_ORDERED_EQUAL			SLJIT_SET(SLJIT_ORDERED_EQUAL)
-#define SLJIT_UNORDERED_OR_NOT_EQUAL		25
-#define SLJIT_SET_UNORDERED_OR_NOT_EQUAL	SLJIT_SET(SLJIT_ORDERED_EQUAL)
-#define SLJIT_ORDERED_LESS			26
-#define SLJIT_SET_ORDERED_LESS			SLJIT_SET(SLJIT_ORDERED_LESS)
-#define SLJIT_UNORDERED_OR_GREATER_EQUAL	27
-#define SLJIT_SET_UNORDERED_OR_GREATER_EQUAL	SLJIT_SET(SLJIT_ORDERED_LESS)
-#define SLJIT_ORDERED_GREATER			28
-#define SLJIT_SET_ORDERED_GREATER		SLJIT_SET(SLJIT_ORDERED_GREATER)
-#define SLJIT_UNORDERED_OR_LESS_EQUAL		29
-#define SLJIT_SET_UNORDERED_OR_LESS_EQUAL	SLJIT_SET(SLJIT_ORDERED_GREATER)
+#define SLJIT2_ORDERED_EQUAL			24
+#define SLJIT2_SET_ORDERED_EQUAL			SLJIT2_SET(SLJIT2_ORDERED_EQUAL)
+#define SLJIT2_UNORDERED_OR_NOT_EQUAL		25
+#define SLJIT2_SET_UNORDERED_OR_NOT_EQUAL	SLJIT2_SET(SLJIT2_ORDERED_EQUAL)
+#define SLJIT2_ORDERED_LESS			26
+#define SLJIT2_SET_ORDERED_LESS			SLJIT2_SET(SLJIT2_ORDERED_LESS)
+#define SLJIT2_UNORDERED_OR_GREATER_EQUAL	27
+#define SLJIT2_SET_UNORDERED_OR_GREATER_EQUAL	SLJIT2_SET(SLJIT2_ORDERED_LESS)
+#define SLJIT2_ORDERED_GREATER			28
+#define SLJIT2_SET_ORDERED_GREATER		SLJIT2_SET(SLJIT2_ORDERED_GREATER)
+#define SLJIT2_UNORDERED_OR_LESS_EQUAL		29
+#define SLJIT2_SET_UNORDERED_OR_LESS_EQUAL	SLJIT2_SET(SLJIT2_ORDERED_GREATER)
 
-#define SLJIT_UNORDERED_OR_EQUAL		30
-#define SLJIT_SET_UNORDERED_OR_EQUAL		SLJIT_SET(SLJIT_UNORDERED_OR_EQUAL)
-#define SLJIT_ORDERED_NOT_EQUAL			31
-#define SLJIT_SET_ORDERED_NOT_EQUAL		SLJIT_SET(SLJIT_UNORDERED_OR_EQUAL)
-#define SLJIT_UNORDERED_OR_LESS			32
-#define SLJIT_SET_UNORDERED_OR_LESS		SLJIT_SET(SLJIT_UNORDERED_OR_LESS)
-#define SLJIT_ORDERED_GREATER_EQUAL		33
-#define SLJIT_SET_ORDERED_GREATER_EQUAL		SLJIT_SET(SLJIT_UNORDERED_OR_LESS)
-#define SLJIT_UNORDERED_OR_GREATER		34
-#define SLJIT_SET_UNORDERED_OR_GREATER		SLJIT_SET(SLJIT_UNORDERED_OR_GREATER)
-#define SLJIT_ORDERED_LESS_EQUAL		35
-#define SLJIT_SET_ORDERED_LESS_EQUAL		SLJIT_SET(SLJIT_UNORDERED_OR_GREATER)
+#define SLJIT2_UNORDERED_OR_EQUAL		30
+#define SLJIT2_SET_UNORDERED_OR_EQUAL		SLJIT2_SET(SLJIT2_UNORDERED_OR_EQUAL)
+#define SLJIT2_ORDERED_NOT_EQUAL			31
+#define SLJIT2_SET_ORDERED_NOT_EQUAL		SLJIT2_SET(SLJIT2_UNORDERED_OR_EQUAL)
+#define SLJIT2_UNORDERED_OR_LESS			32
+#define SLJIT2_SET_UNORDERED_OR_LESS		SLJIT2_SET(SLJIT2_UNORDERED_OR_LESS)
+#define SLJIT2_ORDERED_GREATER_EQUAL		33
+#define SLJIT2_SET_ORDERED_GREATER_EQUAL		SLJIT2_SET(SLJIT2_UNORDERED_OR_LESS)
+#define SLJIT2_UNORDERED_OR_GREATER		34
+#define SLJIT2_SET_UNORDERED_OR_GREATER		SLJIT2_SET(SLJIT2_UNORDERED_OR_GREATER)
+#define SLJIT2_ORDERED_LESS_EQUAL		35
+#define SLJIT2_SET_ORDERED_LESS_EQUAL		SLJIT2_SET(SLJIT2_UNORDERED_OR_GREATER)
 
 /* Unconditional jump types. */
-#define SLJIT_JUMP			36
+#define SLJIT2_JUMP			36
 /* Fast calling method. See the description above. */
-#define SLJIT_FAST_CALL			37
+#define SLJIT2_FAST_CALL			37
 /* Default C calling convention. */
-#define SLJIT_CALL			38
+#define SLJIT2_CALL			38
 /* Called function must be compiled by SLJIT.
-   See SLJIT_ENTER_REG_ARG option. */
-#define SLJIT_CALL_REG_ARG		39
+   See SLJIT2_ENTER_REG_ARG option. */
+#define SLJIT2_CALL_REG_ARG		39
 
-/* The target can be changed during runtime (see: sljit_set_jump_addr). */
-#define SLJIT_REWRITABLE_JUMP		0x1000
+/* The target can be changed during runtime (see: sljit2_set_jump_addr). */
+#define SLJIT2_REWRITABLE_JUMP		0x1000
 /* When this flag is passed, the execution of the current function ends and
    the called function returns to the caller of the current function. The
    stack usage is reduced before the call, but it is not necessarily reduced
    to zero. In the latter case the compiler needs to allocate space for some
    arguments and the return address must be stored on the stack as well. */
-#define SLJIT_CALL_RETURN		0x2000
+#define SLJIT2_CALL_RETURN		0x2000
 
 /* Emit a jump instruction. The destination is not set, only the type of the jump.
-    type must be between SLJIT_EQUAL and SLJIT_FAST_CALL
-    type can be combined (or'ed) with SLJIT_REWRITABLE_JUMP
+    type must be between SLJIT2_EQUAL and SLJIT2_FAST_CALL
+    type can be combined (or'ed) with SLJIT2_REWRITABLE_JUMP
 
    Flags: does not modify flags. */
-SLJIT_API_FUNC_ATTRIBUTE struct sljit_jump* sljit_emit_jump(struct sljit_compiler *compiler, sljit_s32 type);
+SLJIT2_API_FUNC_ATTRIBUTE struct sljit2_jump* sljit2_emit_jump(struct sljit2_compiler *compiler, sljit2_s32 type);
 
 /* Emit a C compiler (ABI) compatible function call.
-    type must be SLJIT_CALL or SLJIT_CALL_REG_ARG
-    type can be combined (or'ed) with SLJIT_REWRITABLE_JUMP and/or SLJIT_CALL_RETURN
-    arg_types can be specified by SLJIT_ARGSx (SLJIT_ARG_RETURN / SLJIT_ARG_VALUE) macros
+    type must be SLJIT2_CALL or SLJIT2_CALL_REG_ARG
+    type can be combined (or'ed) with SLJIT2_REWRITABLE_JUMP and/or SLJIT2_CALL_RETURN
+    arg_types can be specified by SLJIT2_ARGSx (SLJIT2_ARG_RETURN / SLJIT2_ARG_VALUE) macros
 
    Flags: destroy all flags. */
-SLJIT_API_FUNC_ATTRIBUTE struct sljit_jump* sljit_emit_call(struct sljit_compiler *compiler, sljit_s32 type, sljit_s32 arg_types);
+SLJIT2_API_FUNC_ATTRIBUTE struct sljit2_jump* sljit2_emit_call(struct sljit2_compiler *compiler, sljit2_s32 type, sljit2_s32 arg_types);
 
 /* Basic arithmetic comparison. In most architectures it is implemented as
-   a compare operation followed by a sljit_emit_jump. However some
+   a compare operation followed by a sljit2_emit_jump. However some
    architectures (i.e: ARM64 or MIPS) may employ special optimizations
    here. It is suggested to use this comparison form when appropriate.
-    type must be between SLJIT_EQUAL and SLJIT_SIG_LESS_EQUAL
-    type can be combined (or'ed) with SLJIT_REWRITABLE_JUMP
+    type must be between SLJIT2_EQUAL and SLJIT2_SIG_LESS_EQUAL
+    type can be combined (or'ed) with SLJIT2_REWRITABLE_JUMP
 
    Flags: may destroy flags. */
-SLJIT_API_FUNC_ATTRIBUTE struct sljit_jump* sljit_emit_cmp(struct sljit_compiler *compiler, sljit_s32 type,
-	sljit_s32 src1, sljit_sw src1w,
-	sljit_s32 src2, sljit_sw src2w);
+SLJIT2_API_FUNC_ATTRIBUTE struct sljit2_jump* sljit2_emit_cmp(struct sljit2_compiler *compiler, sljit2_s32 type,
+	sljit2_s32 src1, sljit2_sw src1w,
+	sljit2_s32 src2, sljit2_sw src2w);
 
 /* Basic floating point comparison. In most architectures it is implemented as
-   a SLJIT_CMP_F32/64 operation (setting appropriate flags) followed by a
-   sljit_emit_jump. However some architectures (i.e: MIPS) may employ
+   a SLJIT2_CMP_F32/64 operation (setting appropriate flags) followed by a
+   sljit2_emit_jump. However some architectures (i.e: MIPS) may employ
    special optimizations here. It is suggested to use this comparison form
    when appropriate.
-    type must be between SLJIT_F_EQUAL and SLJIT_ORDERED_LESS_EQUAL
-    type can be combined (or'ed) with SLJIT_REWRITABLE_JUMP
+    type must be between SLJIT2_F_EQUAL and SLJIT2_ORDERED_LESS_EQUAL
+    type can be combined (or'ed) with SLJIT2_REWRITABLE_JUMP
    Flags: destroy flags.
    Note: when an operand is NaN the behaviour depends on the comparison type. */
-SLJIT_API_FUNC_ATTRIBUTE struct sljit_jump* sljit_emit_fcmp(struct sljit_compiler *compiler, sljit_s32 type,
-	sljit_s32 src1, sljit_sw src1w,
-	sljit_s32 src2, sljit_sw src2w);
+SLJIT2_API_FUNC_ATTRIBUTE struct sljit2_jump* sljit2_emit_fcmp(struct sljit2_compiler *compiler, sljit2_s32 type,
+	sljit2_s32 src1, sljit2_sw src1w,
+	sljit2_s32 src2, sljit2_sw src2w);
 
 /* Set the destination of the jump to this label. */
-SLJIT_API_FUNC_ATTRIBUTE void sljit_set_label(struct sljit_jump *jump, struct sljit_label* label);
+SLJIT2_API_FUNC_ATTRIBUTE void sljit2_set_label(struct sljit2_jump *jump, struct sljit2_label* label);
 /* Set the destination address of the jump to this label. */
-SLJIT_API_FUNC_ATTRIBUTE void sljit_set_target(struct sljit_jump *jump, sljit_uw target);
+SLJIT2_API_FUNC_ATTRIBUTE void sljit2_set_target(struct sljit2_jump *jump, sljit2_uw target);
 
 /* Emit an indirect jump or fast call.
-   Direct form: set src to SLJIT_IMM() and srcw to the address
+   Direct form: set src to SLJIT2_IMM() and srcw to the address
    Indirect form: any other valid addressing mode
-    type must be between SLJIT_JUMP and SLJIT_FAST_CALL
+    type must be between SLJIT2_JUMP and SLJIT2_FAST_CALL
 
    Flags: does not modify flags. */
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_ijump(struct sljit_compiler *compiler, sljit_s32 type, sljit_s32 src, sljit_sw srcw);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_ijump(struct sljit2_compiler *compiler, sljit2_s32 type, sljit2_s32 src, sljit2_sw srcw);
 
 /* Emit a C compiler (ABI) compatible function call.
-   Direct form: set src to SLJIT_IMM() and srcw to the address
+   Direct form: set src to SLJIT2_IMM() and srcw to the address
    Indirect form: any other valid addressing mode
-    type must be SLJIT_CALL or SLJIT_CALL_REG_ARG
-    type can be combined (or'ed) with SLJIT_CALL_RETURN
-    arg_types can be specified by SLJIT_ARGSx (SLJIT_ARG_RETURN / SLJIT_ARG_VALUE) macros
+    type must be SLJIT2_CALL or SLJIT2_CALL_REG_ARG
+    type can be combined (or'ed) with SLJIT2_CALL_RETURN
+    arg_types can be specified by SLJIT2_ARGSx (SLJIT2_ARG_RETURN / SLJIT2_ARG_VALUE) macros
 
    Flags: destroy all flags. */
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_icall(struct sljit_compiler *compiler, sljit_s32 type, sljit_s32 arg_types, sljit_s32 src, sljit_sw srcw);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_icall(struct sljit2_compiler *compiler, sljit2_s32 type, sljit2_s32 arg_types, sljit2_s32 src, sljit2_sw srcw);
 
 /* Perform an operation using the conditional flags as the second argument.
-   Type must always be between SLJIT_EQUAL and SLJIT_ORDERED_LESS_EQUAL.
+   Type must always be between SLJIT2_EQUAL and SLJIT2_ORDERED_LESS_EQUAL.
    The value represented by the type is 1, if the condition represented
    by the type is fulfilled, and 0 otherwise.
 
-   When op is SLJIT_MOV or SLJIT_MOV32:
+   When op is SLJIT2_MOV or SLJIT2_MOV32:
      Set dst to the value represented by the type (0 or 1).
      Flags: - (does not modify flags)
-   When op is SLJIT_AND, SLJIT_AND32, SLJIT_OR, SLJIT_OR32, SLJIT_XOR, or SLJIT_XOR32
+   When op is SLJIT2_AND, SLJIT2_AND32, SLJIT2_OR, SLJIT2_OR32, SLJIT2_XOR, or SLJIT2_XOR32
      Performs the binary operation using dst as the first, and the value
      represented by type as the second argument. Result is written into dst.
      Flags: Z (may destroy flags) */
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op_flags(struct sljit_compiler *compiler, sljit_s32 op,
-	sljit_s32 dst, sljit_sw dstw,
-	sljit_s32 type);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_op_flags(struct sljit2_compiler *compiler, sljit2_s32 op,
+	sljit2_s32 dst, sljit2_sw dstw,
+	sljit2_s32 type);
 
 /* Emit a conditional select instruction which moves src1 to dst_reg,
    if the condition is satisfied, or src2_reg to dst_reg otherwise.
 
-   type must be between SLJIT_EQUAL and SLJIT_ORDERED_LESS_EQUAL
-   type can be combined (or'ed) with SLJIT_32 to move 32 bit
+   type must be between SLJIT2_EQUAL and SLJIT2_ORDERED_LESS_EQUAL
+   type can be combined (or'ed) with SLJIT2_32 to move 32 bit
        register values instead of word sized ones
    dst_reg and src2_reg must be valid registers
    src1 must be valid operand
@@ -1834,17 +1834,17 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op_flags(struct sljit_compiler *co
          might be loaded even if the condition is false.
 
    Flags: - (does not modify flags) */
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_select(struct sljit_compiler *compiler, sljit_s32 type,
-	sljit_s32 dst_reg,
-	sljit_s32 src1, sljit_sw src1w,
-	sljit_s32 src2_reg);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_select(struct sljit2_compiler *compiler, sljit2_s32 type,
+	sljit2_s32 dst_reg,
+	sljit2_s32 src1, sljit2_sw src1w,
+	sljit2_s32 src2_reg);
 
 /* Emit a conditional floating point select instruction which moves
    src1 to dst_reg, if the condition is satisfied, or src2_reg to
    dst_reg otherwise.
 
-   type must be between SLJIT_EQUAL and SLJIT_ORDERED_LESS_EQUAL
-   type can be combined (or'ed) with SLJIT_32 to move 32 bit
+   type must be between SLJIT2_EQUAL and SLJIT2_ORDERED_LESS_EQUAL
+   type can be combined (or'ed) with SLJIT2_32 to move 32 bit
        floating point values instead of 64 bit ones
    dst_freg and src2_freg must be valid floating point registers
    src1 must be valid operand
@@ -1853,182 +1853,182 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_select(struct sljit_compiler *comp
          might be loaded even if the condition is false.
 
    Flags: - (does not modify flags) */
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fselect(struct sljit_compiler *compiler, sljit_s32 type,
-	sljit_s32 dst_freg,
-	sljit_s32 src1, sljit_sw src1w,
-	sljit_s32 src2_freg);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_fselect(struct sljit2_compiler *compiler, sljit2_s32 type,
+	sljit2_s32 dst_freg,
+	sljit2_s32 src1, sljit2_sw src1w,
+	sljit2_s32 src2_freg);
 
-/* The following flags are used by sljit_emit_mem(), sljit_emit_mem_update(),
-   sljit_emit_fmem(), and sljit_emit_fmem_update(). */
+/* The following flags are used by sljit2_emit_mem(), sljit2_emit_mem_update(),
+   sljit2_emit_fmem(), and sljit2_emit_fmem_update(). */
 
 /* Memory load operation. This is the default. */
-#define SLJIT_MEM_LOAD		0x000000
+#define SLJIT2_MEM_LOAD		0x000000
 /* Memory store operation. */
-#define SLJIT_MEM_STORE		0x000200
+#define SLJIT2_MEM_STORE		0x000200
 
-/* The following flags are used by sljit_emit_mem() and sljit_emit_fmem(). */
+/* The following flags are used by sljit2_emit_mem() and sljit2_emit_fmem(). */
 
 /* Load or stora data from an unaligned (byte aligned) address. */
-#define SLJIT_MEM_UNALIGNED	0x000400
+#define SLJIT2_MEM_UNALIGNED	0x000400
 /* Load or stora data from a 16 bit aligned address. */
-#define SLJIT_MEM_ALIGNED_16	0x000800
+#define SLJIT2_MEM_ALIGNED_16	0x000800
 /* Load or stora data from a 32 bit aligned address. */
-#define SLJIT_MEM_ALIGNED_32	0x001000
+#define SLJIT2_MEM_ALIGNED_32	0x001000
 
-/* The following flags are used by sljit_emit_mem_update(),
-   and sljit_emit_fmem_update(). */
+/* The following flags are used by sljit2_emit_mem_update(),
+   and sljit2_emit_fmem_update(). */
 
 /* Base register is updated before the memory access (default). */
-#define SLJIT_MEM_PRE		0x000000
+#define SLJIT2_MEM_PRE		0x000000
 /* Base register is updated after the memory access. */
-#define SLJIT_MEM_POST		0x000400
+#define SLJIT2_MEM_POST		0x000400
 
-/* When SLJIT_MEM_SUPP is passed, no instructions are emitted.
-   Instead the function returns with SLJIT_SUCCESS if the instruction
-   form is supported and SLJIT_ERR_UNSUPPORTED otherwise. This flag
+/* When SLJIT2_MEM_SUPP is passed, no instructions are emitted.
+   Instead the function returns with SLJIT2_SUCCESS if the instruction
+   form is supported and SLJIT2_ERR_UNSUPPORTED otherwise. This flag
    allows runtime checking of available instruction forms. */
-#define SLJIT_MEM_SUPP		0x000800
+#define SLJIT2_MEM_SUPP		0x000800
 
-/* The sljit_emit_mem emits instructions for various memory operations:
+/* The sljit2_emit_mem emits instructions for various memory operations:
 
-   When SLJIT_MEM_UNALIGNED / SLJIT_MEM_ALIGNED_16 /
-        SLJIT_MEM_ALIGNED_32 is set in type argument:
+   When SLJIT2_MEM_UNALIGNED / SLJIT2_MEM_ALIGNED_16 /
+        SLJIT2_MEM_ALIGNED_32 is set in type argument:
      Emit instructions for unaligned memory loads or stores. When
-     SLJIT_UNALIGNED is not defined, the only way to access unaligned
-     memory data is using sljit_emit_mem. Otherwise all operations (e.g.
-     sljit_emit_op1/2, or sljit_emit_fop1/2) supports unaligned access.
+     SLJIT2_UNALIGNED is not defined, the only way to access unaligned
+     memory data is using sljit2_emit_mem. Otherwise all operations (e.g.
+     sljit2_emit_op1/2, or sljit2_emit_fop1/2) supports unaligned access.
      In general, the performance of unaligned memory accesses are often
      lower than aligned and should be avoided.
 
    When a pair of registers is passed in reg argument:
      Emit instructions for moving data between a register pair and
-     memory. The register pair can be specified by the SLJIT_REG_PAIR
+     memory. The register pair can be specified by the SLJIT2_REG_PAIR
      macro. The first register is loaded from or stored into the
      location specified by the mem/memw arguments, and the end address
      of this operation is the starting address of the data transfer
      between the second register and memory. The type argument must
-     be SLJIT_MOV. The SLJIT_MEM_UNALIGNED / SLJIT_MEM_ALIGNED_*
+     be SLJIT2_MOV. The SLJIT2_MEM_UNALIGNED / SLJIT2_MEM_ALIGNED_*
      options are allowed for this operation.
 
-   type must be between SLJIT_MOV and SLJIT_MOV_P and can be
-     combined (or'ed) with SLJIT_MEM_* flags
+   type must be between SLJIT2_MOV and SLJIT2_MOV_P and can be
+     combined (or'ed) with SLJIT2_MEM_* flags
    reg is a register or register pair, which is the source or
      destination of the operation
    mem must be a memory operand
 
    Flags: - (does not modify flags) */
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_mem(struct sljit_compiler *compiler, sljit_s32 type,
-	sljit_s32 reg,
-	sljit_s32 mem, sljit_sw memw);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_mem(struct sljit2_compiler *compiler, sljit2_s32 type,
+	sljit2_s32 reg,
+	sljit2_s32 mem, sljit2_sw memw);
 
 /* Emit a single memory load or store with update instruction.
    When the requested instruction form is not supported by the CPU,
-   it returns with SLJIT_ERR_UNSUPPORTED instead of emulating the
+   it returns with SLJIT2_ERR_UNSUPPORTED instead of emulating the
    instruction. This allows specializing tight loops based on
-   the supported instruction forms (see SLJIT_MEM_SUPP flag).
-   Absolute address (SLJIT_MEM0) forms are never supported
+   the supported instruction forms (see SLJIT2_MEM_SUPP flag).
+   Absolute address (SLJIT2_MEM0) forms are never supported
    and the base (first) register specified by the mem argument
-   must not be SLJIT_SP and must also be different from the
+   must not be SLJIT2_SP and must also be different from the
    register specified by the reg argument.
 
-   type must be between SLJIT_MOV and SLJIT_MOV_P and can be
-     combined (or'ed) with SLJIT_MEM_* flags
+   type must be between SLJIT2_MOV and SLJIT2_MOV_P and can be
+     combined (or'ed) with SLJIT2_MEM_* flags
    reg is the source or destination register of the operation
    mem must be a memory operand
 
    Flags: - (does not modify flags) */
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_mem_update(struct sljit_compiler *compiler, sljit_s32 type,
-	sljit_s32 reg,
-	sljit_s32 mem, sljit_sw memw);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_mem_update(struct sljit2_compiler *compiler, sljit2_s32 type,
+	sljit2_s32 reg,
+	sljit2_s32 mem, sljit2_sw memw);
 
-/* Same as sljit_emit_mem except the followings:
+/* Same as sljit2_emit_mem except the followings:
 
    Loading or storing a pair of registers is not supported.
 
-   type must be SLJIT_MOV_F64 or SLJIT_MOV_F32 and can be
-     combined (or'ed) with SLJIT_MEM_* flags.
+   type must be SLJIT2_MOV_F64 or SLJIT2_MOV_F32 and can be
+     combined (or'ed) with SLJIT2_MEM_* flags.
    freg is the source or destination floating point register
      of the operation
    mem must be a memory operand
 
    Flags: - (does not modify flags) */
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fmem(struct sljit_compiler *compiler, sljit_s32 type,
-	sljit_s32 freg,
-	sljit_s32 mem, sljit_sw memw);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_fmem(struct sljit2_compiler *compiler, sljit2_s32 type,
+	sljit2_s32 freg,
+	sljit2_s32 mem, sljit2_sw memw);
 
-/* Same as sljit_emit_mem_update except the followings:
+/* Same as sljit2_emit_mem_update except the followings:
 
-   type must be SLJIT_MOV_F64 or SLJIT_MOV_F32 and can be
-     combined (or'ed) with SLJIT_MEM_* flags
+   type must be SLJIT2_MOV_F64 or SLJIT2_MOV_F32 and can be
+     combined (or'ed) with SLJIT2_MEM_* flags
    freg is the source or destination floating point register
      of the operation
    mem must be a memory operand
 
    Flags: - (does not modify flags) */
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fmem_update(struct sljit_compiler *compiler, sljit_s32 type,
-	sljit_s32 freg,
-	sljit_s32 mem, sljit_sw memw);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_fmem_update(struct sljit2_compiler *compiler, sljit2_s32 type,
+	sljit2_s32 freg,
+	sljit2_s32 mem, sljit2_sw memw);
 
 /* The following options are used by several simd operations. */
 
 /* Load data into a vector register, this is the default */
-#define SLJIT_SIMD_LOAD			0x000000
+#define SLJIT2_SIMD_LOAD			0x000000
 /* Store data from a vector register */
-#define SLJIT_SIMD_STORE		0x000001
+#define SLJIT2_SIMD_STORE		0x000001
 /* The vector register contains floating point values */
-#define SLJIT_SIMD_FLOAT		0x000400
+#define SLJIT2_SIMD_FLOAT		0x000400
 /* Tests whether the operation is available */
-#define SLJIT_SIMD_TEST			0x000800
+#define SLJIT2_SIMD_TEST			0x000800
 /* Move data to/from a 64 bit (8 byte) long vector register */
-#define SLJIT_SIMD_REG_64		(3 << 12)
+#define SLJIT2_SIMD_REG_64		(3 << 12)
 /* Move data to/from a 128 bit (16 byte) long vector register */
-#define SLJIT_SIMD_REG_128		(4 << 12)
+#define SLJIT2_SIMD_REG_128		(4 << 12)
 /* Move data to/from a 256 bit (32 byte) long vector register */
-#define SLJIT_SIMD_REG_256		(5 << 12)
+#define SLJIT2_SIMD_REG_256		(5 << 12)
 /* Move data to/from a 512 bit (64 byte) long vector register */
-#define SLJIT_SIMD_REG_512		(6 << 12)
-/* Element size is 8 bit long (this is the default), usually cannot be combined with SLJIT_SIMD_FLOAT */
-#define SLJIT_SIMD_ELEM_8		(0 << 18)
-/* Element size is 16 bit long, usually cannot be combined with SLJIT_SIMD_FLOAT */
-#define SLJIT_SIMD_ELEM_16		(1 << 18)
+#define SLJIT2_SIMD_REG_512		(6 << 12)
+/* Element size is 8 bit long (this is the default), usually cannot be combined with SLJIT2_SIMD_FLOAT */
+#define SLJIT2_SIMD_ELEM_8		(0 << 18)
+/* Element size is 16 bit long, usually cannot be combined with SLJIT2_SIMD_FLOAT */
+#define SLJIT2_SIMD_ELEM_16		(1 << 18)
 /* Element size is 32 bit long */
-#define SLJIT_SIMD_ELEM_32		(2 << 18)
+#define SLJIT2_SIMD_ELEM_32		(2 << 18)
 /* Element size is 64 bit long */
-#define SLJIT_SIMD_ELEM_64		(3 << 18)
+#define SLJIT2_SIMD_ELEM_64		(3 << 18)
 /* Element size is 128 bit long */
-#define SLJIT_SIMD_ELEM_128		(4 << 18)
+#define SLJIT2_SIMD_ELEM_128		(4 << 18)
 /* Element size is 256 bit long */
-#define SLJIT_SIMD_ELEM_256		(5 << 18)
+#define SLJIT2_SIMD_ELEM_256		(5 << 18)
 
-/* The following options are used by sljit_emit_simd_mov()
-   and sljit_emit_simd_op2(). */
+/* The following options are used by sljit2_emit_simd_mov()
+   and sljit2_emit_simd_op2(). */
 
 /* Memory address is unaligned (this is the default) */
-#define SLJIT_SIMD_MEM_UNALIGNED	(0 << 24)
+#define SLJIT2_SIMD_MEM_UNALIGNED	(0 << 24)
 /* Memory address is 16 bit aligned */
-#define SLJIT_SIMD_MEM_ALIGNED_16	(1 << 24)
+#define SLJIT2_SIMD_MEM_ALIGNED_16	(1 << 24)
 /* Memory address is 32 bit aligned */
-#define SLJIT_SIMD_MEM_ALIGNED_32	(2 << 24)
+#define SLJIT2_SIMD_MEM_ALIGNED_32	(2 << 24)
 /* Memory address is 64 bit aligned */
-#define SLJIT_SIMD_MEM_ALIGNED_64	(3 << 24)
+#define SLJIT2_SIMD_MEM_ALIGNED_64	(3 << 24)
 /* Memory address is 128 bit aligned */
-#define SLJIT_SIMD_MEM_ALIGNED_128	(4 << 24)
+#define SLJIT2_SIMD_MEM_ALIGNED_128	(4 << 24)
 /* Memory address is 256 bit aligned */
-#define SLJIT_SIMD_MEM_ALIGNED_256	(5 << 24)
+#define SLJIT2_SIMD_MEM_ALIGNED_256	(5 << 24)
 /* Memory address is 512 bit aligned */
-#define SLJIT_SIMD_MEM_ALIGNED_512	(6 << 24)
+#define SLJIT2_SIMD_MEM_ALIGNED_512	(6 << 24)
 
 /* Moves data between a vector register and memory.
 
    If the operation is not supported, it returns with
-   SLJIT_ERR_UNSUPPORTED. If SLJIT_SIMD_TEST is passed,
+   SLJIT2_ERR_UNSUPPORTED. If SLJIT2_SIMD_TEST is passed,
    it does not emit any instructions.
 
-   type must be a combination of SLJIT_SIMD_* and
-     SLJIT_SIMD_MEM_* options
+   type must be a combination of SLJIT2_SIMD_* and
+     SLJIT2_SIMD_MEM_* options
    vreg is the source or destination vector register
      of the operation
    srcdst must be a memory operand or a vector register
@@ -2039,54 +2039,54 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fmem_update(struct sljit_compiler 
 
    Flags: - (does not modify flags) */
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_simd_mov(struct sljit_compiler *compiler, sljit_s32 type,
-	sljit_s32 vreg,
-	sljit_s32 srcdst, sljit_sw srcdstw);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_simd_mov(struct sljit2_compiler *compiler, sljit2_s32 type,
+	sljit2_s32 vreg,
+	sljit2_s32 srcdst, sljit2_sw srcdstw);
 
 /* Replicates a scalar value to all lanes of a vector
    register.
 
    If the operation is not supported, it returns with
-   SLJIT_ERR_UNSUPPORTED. If SLJIT_SIMD_TEST is passed,
+   SLJIT2_ERR_UNSUPPORTED. If SLJIT2_SIMD_TEST is passed,
    it does not emit any instructions.
 
-   type must be a combination of SLJIT_SIMD_* options
-     except SLJIT_SIMD_STORE.
+   type must be a combination of SLJIT2_SIMD_* options
+     except SLJIT2_SIMD_STORE.
    vreg is the destination vector register of the operation
    src is the value which is replicated
 
    Note:
-       The src == SLJIT_IMM and srcw == 0 can be used to
-       clear a register even when SLJIT_SIMD_FLOAT is set.
+       The src == SLJIT2_IMM and srcw == 0 can be used to
+       clear a register even when SLJIT2_SIMD_FLOAT is set.
 
    Flags: - (does not modify flags) */
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_simd_replicate(struct sljit_compiler *compiler, sljit_s32 type,
-	sljit_s32 vreg,
-	sljit_s32 src, sljit_sw srcw);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_simd_replicate(struct sljit2_compiler *compiler, sljit2_s32 type,
+	sljit2_s32 vreg,
+	sljit2_s32 src, sljit2_sw srcw);
 
-/* The following options are used by sljit_emit_simd_lane_mov(). */
+/* The following options are used by sljit2_emit_simd_lane_mov(). */
 
 /* Clear all bits of the simd register before loading the lane. */
-#define SLJIT_SIMD_LANE_ZERO		0x000002
+#define SLJIT2_SIMD_LANE_ZERO		0x000002
 /* Sign extend the integer value stored from the lane. */
-#define SLJIT_SIMD_LANE_SIGNED		0x000004
+#define SLJIT2_SIMD_LANE_SIGNED		0x000004
 
 /* Moves data between a vector register lane and a register or
    memory. If the srcdst argument is a register, it must be
-   a floating point register when SLJIT_SIMD_FLOAT is specified,
+   a floating point register when SLJIT2_SIMD_FLOAT is specified,
    or a general purpose register otherwise.
 
    If the operation is not supported, it returns with
-   SLJIT_ERR_UNSUPPORTED. If SLJIT_SIMD_TEST is passed,
+   SLJIT2_ERR_UNSUPPORTED. If SLJIT2_SIMD_TEST is passed,
    it does not emit any instructions.
 
-   type must be a combination of SLJIT_SIMD_* options
+   type must be a combination of SLJIT2_SIMD_* options
      Further options:
-       SLJIT_32 - when SLJIT_SIMD_FLOAT is not set
-       SLJIT_SIMD_LANE_SIGNED - when SLJIT_SIMD_STORE
-           is set and SLJIT_SIMD_FLOAT is not set
-       SLJIT_SIMD_LANE_ZERO - when SLJIT_SIMD_LOAD
+       SLJIT2_32 - when SLJIT2_SIMD_FLOAT is not set
+       SLJIT2_SIMD_LANE_SIGNED - when SLJIT2_SIMD_STORE
+           is set and SLJIT2_SIMD_FLOAT is not set
+       SLJIT2_SIMD_LANE_ZERO - when SLJIT2_SIMD_LOAD
            is specified
    vreg is the source or destination vector register
      of the operation
@@ -2099,39 +2099,39 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_simd_replicate(struct sljit_compil
 
    Flags: - (does not modify flags) */
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_simd_lane_mov(struct sljit_compiler *compiler, sljit_s32 type,
-	sljit_s32 vreg, sljit_s32 lane_index,
-	sljit_s32 srcdst, sljit_sw srcdstw);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_simd_lane_mov(struct sljit2_compiler *compiler, sljit2_s32 type,
+	sljit2_s32 vreg, sljit2_s32 lane_index,
+	sljit2_s32 srcdst, sljit2_sw srcdstw);
 
 /* Replicates a scalar value from a lane to all lanes
    of a vector register.
 
    If the operation is not supported, it returns with
-   SLJIT_ERR_UNSUPPORTED. If SLJIT_SIMD_TEST is passed,
+   SLJIT2_ERR_UNSUPPORTED. If SLJIT2_SIMD_TEST is passed,
    it does not emit any instructions.
 
-   type must be a combination of SLJIT_SIMD_* options
-     except SLJIT_SIMD_STORE.
+   type must be a combination of SLJIT2_SIMD_* options
+     except SLJIT2_SIMD_STORE.
    vreg is the destination vector register of the operation
    src is the vector register which lane is replicated
    src_lane_index is the lane index of the src register
 
    Flags: - (does not modify flags) */
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_simd_lane_replicate(struct sljit_compiler *compiler, sljit_s32 type,
-	sljit_s32 vreg,
-	sljit_s32 src, sljit_s32 src_lane_index);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_simd_lane_replicate(struct sljit2_compiler *compiler, sljit2_s32 type,
+	sljit2_s32 vreg,
+	sljit2_s32 src, sljit2_s32 src_lane_index);
 
-/* The following options are used by sljit_emit_simd_load_extend(). */
+/* The following options are used by sljit2_emit_simd_load_extend(). */
 
 /* Sign extend the integer elements */
-#define SLJIT_SIMD_EXTEND_SIGNED	0x000002
+#define SLJIT2_SIMD_EXTEND_SIGNED	0x000002
 /* Extend data to 16 bit */
-#define SLJIT_SIMD_EXTEND_16		(1 << 24)
+#define SLJIT2_SIMD_EXTEND_16		(1 << 24)
 /* Extend data to 32 bit */
-#define SLJIT_SIMD_EXTEND_32		(2 << 24)
+#define SLJIT2_SIMD_EXTEND_32		(2 << 24)
 /* Extend data to 64 bit */
-#define SLJIT_SIMD_EXTEND_64		(3 << 24)
+#define SLJIT2_SIMD_EXTEND_64		(3 << 24)
 
 /* Extend elements and stores them in a vector register.
    The extension operation increases the size of the
@@ -2139,11 +2139,11 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_simd_lane_replicate(struct sljit_c
    values, the extension can be signed or unsigned.
 
    If the operation is not supported, it returns with
-   SLJIT_ERR_UNSUPPORTED. If SLJIT_SIMD_TEST is passed,
+   SLJIT2_ERR_UNSUPPORTED. If SLJIT2_SIMD_TEST is passed,
    it does not emit any instructions.
 
-   type must be a combination of SLJIT_SIMD_*, and
-     SLJIT_SIMD_EXTEND_* options except SLJIT_SIMD_STORE
+   type must be a combination of SLJIT2_SIMD_*, and
+     SLJIT2_SIMD_EXTEND_* options except SLJIT2_SIMD_STORE
    vreg is the destination vector register of the operation
    src must be a memory operand or a vector register.
      In the latter case, the source elements are stored
@@ -2151,76 +2151,76 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_simd_lane_replicate(struct sljit_c
 
    Flags: - (does not modify flags) */
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_simd_extend(struct sljit_compiler *compiler, sljit_s32 type,
-	sljit_s32 vreg,
-	sljit_s32 src, sljit_sw srcw);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_simd_extend(struct sljit2_compiler *compiler, sljit2_s32 type,
+	sljit2_s32 vreg,
+	sljit2_s32 src, sljit2_sw srcw);
 
 /* Extract the highest bit (usually the sign bit) from
    each elements of a vector.
 
    If the operation is not supported, it returns with
-   SLJIT_ERR_UNSUPPORTED. If SLJIT_SIMD_TEST is passed,
+   SLJIT2_ERR_UNSUPPORTED. If SLJIT2_SIMD_TEST is passed,
    it does not emit any instructions.
 
-   type must be a combination of SLJIT_SIMD_* and SLJIT_32
-     options except SLJIT_SIMD_LOAD
+   type must be a combination of SLJIT2_SIMD_* and SLJIT2_32
+     options except SLJIT2_SIMD_LOAD
    vreg is the source vector register of the operation
    dst is the destination operand
 
    Flags: - (does not modify flags) */
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_simd_sign(struct sljit_compiler *compiler, sljit_s32 type,
-	sljit_s32 vreg,
-	sljit_s32 dst, sljit_sw dstw);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_simd_sign(struct sljit2_compiler *compiler, sljit2_s32 type,
+	sljit2_s32 vreg,
+	sljit2_s32 dst, sljit2_sw dstw);
 
-/* The following operations are used by sljit_emit_simd_op2(). */
+/* The following operations are used by sljit2_emit_simd_op2(). */
 
 /* Binary 'and' operation */
-#define SLJIT_SIMD_OP2_AND		0x000001
+#define SLJIT2_SIMD_OP2_AND		0x000001
 /* Binary 'or' operation */
-#define SLJIT_SIMD_OP2_OR		0x000002
+#define SLJIT2_SIMD_OP2_OR		0x000002
 /* Binary 'xor' operation */
-#define SLJIT_SIMD_OP2_XOR		0x000003
+#define SLJIT2_SIMD_OP2_XOR		0x000003
 /* Shuffle bytes of src1 using the indicies in src2 */
-#define SLJIT_SIMD_OP2_SHUFFLE		0x000004
+#define SLJIT2_SIMD_OP2_SHUFFLE		0x000004
 
 /* Perform simd operations using vector registers.
 
    If the operation is not supported, it returns with
-   SLJIT_ERR_UNSUPPORTED. If SLJIT_SIMD_TEST is passed,
+   SLJIT2_ERR_UNSUPPORTED. If SLJIT2_SIMD_TEST is passed,
    it does not emit any instructions.
 
-   type must be a combination of SLJIT_SIMD_*, SLJIT_SIMD_MEM_*
-     and SLJIT_SIMD_OP2_* options except SLJIT_SIMD_LOAD
-     and SLJIT_SIMD_STORE
+   type must be a combination of SLJIT2_SIMD_*, SLJIT2_SIMD_MEM_*
+     and SLJIT2_SIMD_OP2_* options except SLJIT2_SIMD_LOAD
+     and SLJIT2_SIMD_STORE
    dst_vreg is the destination register of the operation
    src1_vreg is the first source register of the operation
    src2 is the second source operand of the operation
 
    Flags: - (does not modify flags) */
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_simd_op2(struct sljit_compiler *compiler, sljit_s32 type,
-	sljit_s32 dst_vreg, sljit_s32 src1_vreg, sljit_s32 src2, sljit_sw src2w);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_simd_op2(struct sljit2_compiler *compiler, sljit2_s32 type,
+	sljit2_s32 dst_vreg, sljit2_s32 src1_vreg, sljit2_s32 src2, sljit2_sw src2w);
 
-/* The following operations are used by sljit_emit_atomic_load() and
-   sljit_emit_atomic_store() operations. */
+/* The following operations are used by sljit2_emit_atomic_load() and
+   sljit2_emit_atomic_store() operations. */
 
 /* Tests whether the atomic operation is available (does not generate
    any instructions). When a load from is allowed, its corresponding
    store form is allowed and vice versa. */
-#define SLJIT_ATOMIC_TEST 0x10000
+#define SLJIT2_ATOMIC_TEST 0x10000
 /* The compiler must generate compare and swap instruction.
-   When this bit is set, calling sljit_emit_atomic_load() is optional. */
-#define SLJIT_ATOMIC_USE_CAS 0x20000
+   When this bit is set, calling sljit2_emit_atomic_load() is optional. */
+#define SLJIT2_ATOMIC_USE_CAS 0x20000
 /* The compiler must generate load-acquire and store-release instructions.
-   When this bit is set, the temp_reg for sljit_emit_atomic_store is not used. */
-#define SLJIT_ATOMIC_USE_LS 0x40000
+   When this bit is set, the temp_reg for sljit2_emit_atomic_store is not used. */
+#define SLJIT2_ATOMIC_USE_LS 0x40000
 
-/* The sljit_emit_atomic_load and sljit_emit_atomic_store operation pair
+/* The sljit2_emit_atomic_load and sljit2_emit_atomic_store operation pair
    can perform an atomic read-modify-write operation. First, an unsigned
-   value must be loaded from memory using sljit_emit_atomic_load. Then,
+   value must be loaded from memory using sljit2_emit_atomic_load. Then,
    the updated value must be written back to the same memory location by
-   sljit_emit_atomic_store. A thread can only perform a single atomic
+   sljit2_emit_atomic_store. A thread can only perform a single atomic
    operation at a time.
 
    The following conditions must be satisfied, or the operation
@@ -2233,102 +2233,102 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_simd_op2(struct sljit_compiler *co
        can be a different register, only its value must be the same)
      - a store must always follow a load for the same transaction.
 
-   op must be between SLJIT_MOV and SLJIT_MOV_P
+   op must be between SLJIT2_MOV and SLJIT2_MOV_P
    dst_reg is the register where the data will be loaded into
    mem_reg is the base address of the memory load (it cannot be
-     SLJIT_SP or a virtual register on x86-32)
+     SLJIT2_SP or a virtual register on x86-32)
 
    Flags: - (does not modify flags) */
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_atomic_load(struct sljit_compiler *compiler, sljit_s32 op,
-	sljit_s32 dst_reg,
-	sljit_s32 mem_reg);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_atomic_load(struct sljit2_compiler *compiler, sljit2_s32 op,
+	sljit2_s32 dst_reg,
+	sljit2_s32 mem_reg);
 
-/* The sljit_emit_atomic_load and sljit_emit_atomic_store operations
+/* The sljit2_emit_atomic_load and sljit2_emit_atomic_store operations
    allows performing an atomic read-modify-write operation. See the
-   description of sljit_emit_atomic_load.
+   description of sljit2_emit_atomic_load.
 
-   op must be between SLJIT_MOV and SLJIT_MOV_P
+   op must be between SLJIT2_MOV and SLJIT2_MOV_P
    src_reg is the register which value is stored into the memory
    mem_reg is the base address of the memory store (it cannot be
-     SLJIT_SP or a virtual register on x86-32)
+     SLJIT2_SP or a virtual register on x86-32)
    temp_reg is a scratch register, which must be initialized with
      the value loaded into the dst_reg during the corresponding
-     sljit_emit_atomic_load operation, or the operation is undefined.
+     sljit2_emit_atomic_load operation, or the operation is undefined.
      The temp_reg register preserves its value, if the memory store
      is successful. Otherwise, its value is undefined.
 
    Flags: ATOMIC_STORED
      if ATOMIC_STORED flag is set, it represents that the memory
      is updated with a new value. Otherwise the memory is unchanged. */
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_atomic_store(struct sljit_compiler *compiler, sljit_s32 op,
-	sljit_s32 src_reg,
-	sljit_s32 mem_reg,
-	sljit_s32 temp_reg);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_atomic_store(struct sljit2_compiler *compiler, sljit2_s32 op,
+	sljit2_s32 src_reg,
+	sljit2_s32 mem_reg,
+	sljit2_s32 temp_reg);
 
-/* Copies the base address of SLJIT_SP + offset to dst. The offset can
+/* Copies the base address of SLJIT2_SP + offset to dst. The offset can
    represent the starting address of a value in the local data (stack).
    The offset is not limited by the local data limits, it can be any value.
    For example if an array of bytes are stored on the stack from
    offset 0x40, and R0 contains the offset of an array item plus 0x120,
    this item can be changed by two SLJIT instructions:
 
-   sljit_get_local_base(compiler, SLJIT_R1, 0, 0x40 - 0x120);
-   sljit_emit_op1(compiler, SLJIT_MOV_U8, SLJIT_MEM2(SLJIT_R1, SLJIT_R0), 0, SLJIT_IMM, 0x5);
+   sljit2_get_local_base(compiler, SLJIT2_R1, 0, 0x40 - 0x120);
+   sljit2_emit_op1(compiler, SLJIT2_MOV_U8, SLJIT2_MEM2(SLJIT2_R1, SLJIT2_R0), 0, SLJIT2_IMM, 0x5);
 
    Flags: - (may destroy flags) */
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_local_base(struct sljit_compiler *compiler, sljit_s32 dst, sljit_sw dstw, sljit_sw offset);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_get_local_base(struct sljit2_compiler *compiler, sljit2_s32 dst, sljit2_sw dstw, sljit2_sw offset);
 
-/* Store a value that can be changed runtime (see: sljit_get_const_addr / sljit_set_const)
+/* Store a value that can be changed runtime (see: sljit2_get_const_addr / sljit2_set_const)
    Flags: - (does not modify flags) */
-SLJIT_API_FUNC_ATTRIBUTE struct sljit_const* sljit_emit_const(struct sljit_compiler *compiler, sljit_s32 dst, sljit_sw dstw, sljit_sw init_value);
+SLJIT2_API_FUNC_ATTRIBUTE struct sljit2_const* sljit2_emit_const(struct sljit2_compiler *compiler, sljit2_s32 dst, sljit2_sw dstw, sljit2_sw init_value);
 
-/* Store the value of a label (see: sljit_set_label / sljit_set_target)
+/* Store the value of a label (see: sljit2_set_label / sljit2_set_target)
    Flags: - (does not modify flags) */
-SLJIT_API_FUNC_ATTRIBUTE struct sljit_jump* sljit_emit_mov_addr(struct sljit_compiler *compiler, sljit_s32 dst, sljit_sw dstw);
+SLJIT2_API_FUNC_ATTRIBUTE struct sljit2_jump* sljit2_emit_mov_addr(struct sljit2_compiler *compiler, sljit2_s32 dst, sljit2_sw dstw);
 
-/* Provides the address of label, jump and const instructions after sljit_generate_code
-   is called. The returned value is unspecified before the sljit_generate_code call.
-   Since these structures are freed by sljit_free_compiler, the addresses must be
+/* Provides the address of label, jump and const instructions after sljit2_generate_code
+   is called. The returned value is unspecified before the sljit2_generate_code call.
+   Since these structures are freed by sljit2_free_compiler, the addresses must be
    preserved by the user program elsewere. */
-static SLJIT_INLINE sljit_uw sljit_get_label_addr(struct sljit_label *label) { return label->u.addr; }
-static SLJIT_INLINE sljit_uw sljit_get_jump_addr(struct sljit_jump *jump) { return jump->addr; }
-static SLJIT_INLINE sljit_uw sljit_get_const_addr(struct sljit_const *const_) { return const_->addr; }
+static SLJIT2_INLINE sljit2_uw sljit2_get_label_addr(struct sljit2_label *label) { return label->u.addr; }
+static SLJIT2_INLINE sljit2_uw sljit2_get_jump_addr(struct sljit2_jump *jump) { return jump->addr; }
+static SLJIT2_INLINE sljit2_uw sljit2_get_const_addr(struct sljit2_const *const_) { return const_->addr; }
 
 /* Only the address and executable offset are required to perform dynamic
-   code modifications. See sljit_get_executable_offset function. */
-SLJIT_API_FUNC_ATTRIBUTE void sljit_set_jump_addr(sljit_uw addr, sljit_uw new_target, sljit_sw executable_offset);
-SLJIT_API_FUNC_ATTRIBUTE void sljit_set_const(sljit_uw addr, sljit_sw new_constant, sljit_sw executable_offset);
+   code modifications. See sljit2_get_executable_offset function. */
+SLJIT2_API_FUNC_ATTRIBUTE void sljit2_set_jump_addr(sljit2_uw addr, sljit2_uw new_target, sljit2_sw executable_offset);
+SLJIT2_API_FUNC_ATTRIBUTE void sljit2_set_const(sljit2_uw addr, sljit2_sw new_constant, sljit2_sw executable_offset);
 
 /* --------------------------------------------------------------------- */
 /*  CPU specific functions                                               */
 /* --------------------------------------------------------------------- */
 
-/* Types for sljit_get_register_index */
+/* Types for sljit2_get_register_index */
 
 /* General purpose (integer) registers. */
-#define SLJIT_GP_REGISTER 0
+#define SLJIT2_GP_REGISTER 0
 /* Floating point registers. */
-#define SLJIT_FLOAT_REGISTER 1
+#define SLJIT2_FLOAT_REGISTER 1
 
-/* The following function is a helper function for sljit_emit_op_custom.
+/* The following function is a helper function for sljit2_emit_op_custom.
    It returns with the real machine register index ( >=0 ) of any registers.
 
-   When type is SLJIT_GP_REGISTER:
-      reg must be an SLJIT_R(i), SLJIT_S(i), or SLJIT_SP register
+   When type is SLJIT2_GP_REGISTER:
+      reg must be an SLJIT2_R(i), SLJIT2_S(i), or SLJIT2_SP register
 
-   When type is SLJIT_FLOAT_REGISTER:
-      reg must be an SLJIT_FR(i) or SLJIT_FS(i) register
+   When type is SLJIT2_FLOAT_REGISTER:
+      reg must be an SLJIT2_FR(i) or SLJIT2_FS(i) register
 
-   When type is SLJIT_SIMD_REG_64 / 128 / 256 / 512 :
-      reg must be an SLJIT_FR(i) or SLJIT_FS(i) register
+   When type is SLJIT2_SIMD_REG_64 / 128 / 256 / 512 :
+      reg must be an SLJIT2_FR(i) or SLJIT2_FS(i) register
 
    Note: it returns with -1 for unknown registers, such as virtual
          registers on x86-32 or unsupported simd registers. */
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_register_index(sljit_s32 type, sljit_s32 reg);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_get_register_index(sljit2_s32 type, sljit2_s32 reg);
 
 /* Any instruction can be inserted into the instruction stream by
-   sljit_emit_op_custom. It has a similar purpose as inline assembly.
+   sljit2_emit_op_custom. It has a similar purpose as inline assembly.
    The size parameter must match to the instruction size of the target
    architecture:
 
@@ -2338,30 +2338,30 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_register_index(sljit_s32 type, slji
        s390x: size can be 2, 4, or 6, the instruction argument can be byte aligned.
    Otherwise: size must be 4 and instruction argument must be 4 byte aligned. */
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op_custom(struct sljit_compiler *compiler,
-	void *instruction, sljit_u32 size);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_emit_op_custom(struct sljit2_compiler *compiler,
+	void *instruction, sljit2_u32 size);
 
 /* Flags were set by a 32 bit operation. */
-#define SLJIT_CURRENT_FLAGS_32			SLJIT_32
+#define SLJIT2_CURRENT_FLAGS_32			SLJIT2_32
 
 /* Flags were set by an ADD or ADDC operations. */
-#define SLJIT_CURRENT_FLAGS_ADD			0x01
+#define SLJIT2_CURRENT_FLAGS_ADD			0x01
 /* Flags were set by a SUB, SUBC, or NEG operation. */
-#define SLJIT_CURRENT_FLAGS_SUB			0x02
+#define SLJIT2_CURRENT_FLAGS_SUB			0x02
 
-/* Flags were set by sljit_emit_op2u with SLJIT_SUB opcode.
-   Must be combined with SLJIT_CURRENT_FLAGS_SUB. */
-#define SLJIT_CURRENT_FLAGS_COMPARE		0x04
+/* Flags were set by sljit2_emit_op2u with SLJIT2_SUB opcode.
+   Must be combined with SLJIT2_CURRENT_FLAGS_SUB. */
+#define SLJIT2_CURRENT_FLAGS_COMPARE		0x04
 
 /* Define the currently available CPU status flags. It is usually used after
-   an sljit_emit_label or sljit_emit_op_custom operations to define which CPU
+   an sljit2_emit_label or sljit2_emit_op_custom operations to define which CPU
    status flags are available.
 
-   The current_flags must be a valid combination of SLJIT_SET_* and
-   SLJIT_CURRENT_FLAGS_* constants. */
+   The current_flags must be a valid combination of SLJIT2_SET_* and
+   SLJIT2_CURRENT_FLAGS_* constants. */
 
-SLJIT_API_FUNC_ATTRIBUTE void sljit_set_current_flags(struct sljit_compiler *compiler,
-	sljit_s32 current_flags);
+SLJIT2_API_FUNC_ATTRIBUTE void sljit2_set_current_flags(struct sljit2_compiler *compiler,
+	sljit2_s32 current_flags);
 
 /* --------------------------------------------------------------------- */
 /*  Serialization functions                                              */
@@ -2372,72 +2372,72 @@ SLJIT_API_FUNC_ATTRIBUTE void sljit_set_current_flags(struct sljit_compiler *com
    preserves this order for each group. For example the fifth label
    after deserialization refers to the same machine code location as
    the fifth label before the serialization. */
-static SLJIT_INLINE struct sljit_label *sljit_get_first_label(struct sljit_compiler *compiler) { return compiler->labels; }
-static SLJIT_INLINE struct sljit_jump *sljit_get_first_jump(struct sljit_compiler *compiler) { return compiler->jumps; }
-static SLJIT_INLINE struct sljit_const *sljit_get_first_const(struct sljit_compiler *compiler) { return compiler->consts; }
+static SLJIT2_INLINE struct sljit2_label *sljit2_get_first_label(struct sljit2_compiler *compiler) { return compiler->labels; }
+static SLJIT2_INLINE struct sljit2_jump *sljit2_get_first_jump(struct sljit2_compiler *compiler) { return compiler->jumps; }
+static SLJIT2_INLINE struct sljit2_const *sljit2_get_first_const(struct sljit2_compiler *compiler) { return compiler->consts; }
 
-static SLJIT_INLINE struct sljit_label *sljit_get_next_label(struct sljit_label *label) { return label->next; }
-static SLJIT_INLINE struct sljit_jump *sljit_get_next_jump(struct sljit_jump *jump) { return jump->next; }
-static SLJIT_INLINE struct sljit_const *sljit_get_next_const(struct sljit_const *const_) { return const_->next; }
+static SLJIT2_INLINE struct sljit2_label *sljit2_get_next_label(struct sljit2_label *label) { return label->next; }
+static SLJIT2_INLINE struct sljit2_jump *sljit2_get_next_jump(struct sljit2_jump *jump) { return jump->next; }
+static SLJIT2_INLINE struct sljit2_const *sljit2_get_next_const(struct sljit2_const *const_) { return const_->next; }
 
 /* A number starting from 0 is assigned to each label, which
 represents its creation index. The first label created by the
 compiler has index 0, the second has index 1, the third has
 index 2, and so on. The returned value is unspecified after
-sljit_generate_code() is called. */
-static SLJIT_INLINE sljit_uw sljit_get_label_index(struct sljit_label *label) { return label->u.index; }
+sljit2_generate_code() is called. */
+static SLJIT2_INLINE sljit2_uw sljit2_get_label_index(struct sljit2_label *label) { return label->u.index; }
 
-/* The sljit_jump_has_label() and sljit_jump_has_target() functions
+/* The sljit2_jump_has_label() and sljit2_jump_has_target() functions
 returns non-zero value if a label or target is set for the jump
 respectively. Both may return with a zero value. The other two
 functions return the value assigned to the jump. */
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_jump_has_label(struct sljit_jump *jump);
-static SLJIT_INLINE struct sljit_label *sljit_jump_get_label(struct sljit_jump *jump) { return jump->u.label; }
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_jump_has_target(struct sljit_jump *jump);
-static SLJIT_INLINE sljit_uw sljit_jump_get_target(struct sljit_jump *jump) { return jump->u.target; }
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_jump_is_mov_addr(struct sljit_jump *jump);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_jump_has_label(struct sljit2_jump *jump);
+static SLJIT2_INLINE struct sljit2_label *sljit2_jump_get_label(struct sljit2_jump *jump) { return jump->u.label; }
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_jump_has_target(struct sljit2_jump *jump);
+static SLJIT2_INLINE sljit2_uw sljit2_jump_get_target(struct sljit2_jump *jump) { return jump->u.target; }
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_s32 sljit2_jump_is_mov_addr(struct sljit2_jump *jump);
 
-/* Option bits for sljit_serialize_compiler. */
+/* Option bits for sljit2_serialize_compiler. */
 
 /* When debugging is enabled, the serialized buffer contains
 debugging information unless this option is specified. */
-#define SLJIT_SERIALIZE_IGNORE_DEBUG		0x1
+#define SLJIT2_SERIALIZE_IGNORE_DEBUG		0x1
 
 /* Serialize the internal structure of the compiler into a buffer.
 If the serialization is successful, the returned value is a newly
 allocated buffer which is allocated by the memory allocator assigned
 to the compiler. Otherwise the returned value is NULL. Unlike
-sljit_generate_code(), serialization does not modify the internal
+sljit2_generate_code(), serialization does not modify the internal
 state of the compiler, so the code generation can be continued.
 
-  options must be the combination of SLJIT_SERIALIZE_* option bits
+  options must be the combination of SLJIT2_SERIALIZE_* option bits
   size is an output argument, which is set to the byte size of
     the result buffer if the operation is successful
 
 Notes:
   - This function is useful for ahead-of-time compilation (AOT).
   - The returned buffer must be freed later by the caller.
-    The SLJIT_FREE() macro is suitable for this purpose:
-    SLJIT_FREE(returned_buffer, sljit_get_allocator_data(compiler))
-  - Memory allocated by sljit_alloc_memory() is not serialized.
-  - The type of the returned buffer is sljit_uw* to emphasize that
+    The SLJIT2_FREE() macro is suitable for this purpose:
+    SLJIT2_FREE(returned_buffer, sljit2_get_allocator_data(compiler))
+  - Memory allocated by sljit2_alloc_memory() is not serialized.
+  - The type of the returned buffer is sljit2_uw* to emphasize that
     the buffer is word aligned. However, the 'size' output argument
     contains the byte size, so this value is always divisible by
-    sizeof(sljit_uw).
+    sizeof(sljit2_uw).
 */
-SLJIT_API_FUNC_ATTRIBUTE sljit_uw* sljit_serialize_compiler(struct sljit_compiler *compiler,
-	sljit_s32 options, sljit_uw *size);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_uw* sljit2_serialize_compiler(struct sljit2_compiler *compiler,
+	sljit2_s32 options, sljit2_uw *size);
 
 /* Construct a new compiler instance from a buffer produced by
-sljit_serialize_compiler(). If the operation is successful, the new
+sljit2_serialize_compiler(). If the operation is successful, the new
 compiler instance is returned. Otherwise the returned value is NULL.
 
   buffer points to a word aligned memory data which was
-    created by sljit_serialize_compiler()
+    created by sljit2_serialize_compiler()
   size is the byte size of the buffer
   options must be 0
   allocator_data specify an allocator specific data, see
-                 sljit_create_compiler() for further details
+                 sljit2_create_compiler() for further details
 
 Notes:
   - Labels assigned to jumps are restored with their
@@ -2445,15 +2445,15 @@ Notes:
     the deserializer. Target addresses assigned to
     jumps are also restored. Uninitialized jumps
     remain uninitialized.
-  - After the deserialization, sljit_generate_code() does
+  - After the deserialization, sljit2_generate_code() does
     not need to be the next operation on the returned
     compiler, the code generation can be continued.
-    Even sljit_serialize_compiler() can be called again.
+    Even sljit2_serialize_compiler() can be called again.
   - When debugging is enabled, a buffers without debug
     information cannot be deserialized.
 */
-SLJIT_API_FUNC_ATTRIBUTE struct sljit_compiler *sljit_deserialize_compiler(sljit_uw* buffer, sljit_uw size,
-	sljit_s32 options, void *allocator_data);
+SLJIT2_API_FUNC_ATTRIBUTE struct sljit2_compiler *sljit2_deserialize_compiler(sljit2_uw* buffer, sljit2_uw size,
+	sljit2_s32 options, void *allocator_data);
 
 /* --------------------------------------------------------------------- */
 /*  Miscellaneous utility functions                                      */
@@ -2462,28 +2462,28 @@ SLJIT_API_FUNC_ATTRIBUTE struct sljit_compiler *sljit_deserialize_compiler(sljit
 /* Get the human readable name of the platform. Can be useful on platforms
    like ARM, where ARM and Thumb2 functions can be mixed, and it is useful
    to know the type of the code generator. */
-SLJIT_API_FUNC_ATTRIBUTE const char* sljit_get_platform_name(void);
+SLJIT2_API_FUNC_ATTRIBUTE const char* sljit2_get_platform_name(void);
 
 /* Portable helper function to get an offset of a member.
    Same as offsetof() macro defined in stddef.h */
-#define SLJIT_OFFSETOF(base, member) ((sljit_sw)(&((base*)0x10)->member) - 0x10)
+#define SLJIT2_OFFSETOF(base, member) ((sljit2_sw)(&((base*)0x10)->member) - 0x10)
 
-#if (defined SLJIT_UTIL_STACK && SLJIT_UTIL_STACK)
+#if (defined SLJIT2_UTIL_STACK && SLJIT2_UTIL_STACK)
 
-/* The sljit_stack structure and its manipulation functions provides
+/* The sljit2_stack structure and its manipulation functions provides
    an implementation for a top-down stack. The stack top is stored
-   in the end field of the sljit_stack structure and the stack goes
+   in the end field of the sljit2_stack structure and the stack goes
    down to the min_start field, so the memory region reserved for
    this stack is between min_start (inclusive) and end (exclusive)
    fields. However the application can only use the region between
-   start (inclusive) and end (exclusive) fields. The sljit_stack_resize
+   start (inclusive) and end (exclusive) fields. The sljit2_stack_resize
    function can be used to extend this region up to min_start.
 
    This feature uses the "address space reserve" feature of modern
    operating systems. Instead of allocating a large memory block
    applications can allocate a small memory region and extend it
    later without moving the content of the memory area. Therefore
-   after a successful resize by sljit_stack_resize all pointers into
+   after a successful resize by sljit2_stack_resize all pointers into
    this region are still valid.
 
    Note:
@@ -2492,72 +2492,72 @@ SLJIT_API_FUNC_ATTRIBUTE const char* sljit_get_platform_name(void);
          4 Kbyte or more).
      stack should grow in larger steps, e.g. 4Kbyte, 16Kbyte or more. */
 
-struct sljit_stack {
+struct sljit2_stack {
 	/* User data, anything can be stored here.
 	   Initialized to the same value as the end field. */
-	sljit_u8 *top;
+	sljit2_u8 *top;
 /* These members are read only. */
 	/* End address of the stack */
-	sljit_u8 *end;
+	sljit2_u8 *end;
 	/* Current start address of the stack. */
-	sljit_u8 *start;
+	sljit2_u8 *start;
 	/* Lowest start address of the stack. */
-	sljit_u8 *min_start;
+	sljit2_u8 *min_start;
 };
 
 /* Allocates a new stack. Returns NULL if unsuccessful.
-   Note: see sljit_create_compiler for the explanation of allocator_data. */
-SLJIT_API_FUNC_ATTRIBUTE struct sljit_stack* SLJIT_FUNC sljit_allocate_stack(sljit_uw start_size, sljit_uw max_size, void *allocator_data);
-SLJIT_API_FUNC_ATTRIBUTE void SLJIT_FUNC sljit_free_stack(struct sljit_stack *stack, void *allocator_data);
+   Note: see sljit2_create_compiler for the explanation of allocator_data. */
+SLJIT2_API_FUNC_ATTRIBUTE struct sljit2_stack* SLJIT2_FUNC sljit2_allocate_stack(sljit2_uw start_size, sljit2_uw max_size, void *allocator_data);
+SLJIT2_API_FUNC_ATTRIBUTE void SLJIT2_FUNC sljit2_free_stack(struct sljit2_stack *stack, void *allocator_data);
 
 /* Can be used to increase (extend) or decrease (shrink) the stack
    memory area. Returns with new_start if successful and NULL otherwise.
    It always fails if new_start is less than min_start or greater or equal
    than end fields. The fields of the stack are not changed if the returned
    value is NULL (the current memory content is never lost). */
-SLJIT_API_FUNC_ATTRIBUTE sljit_u8 *SLJIT_FUNC sljit_stack_resize(struct sljit_stack *stack, sljit_u8 *new_start);
+SLJIT2_API_FUNC_ATTRIBUTE sljit2_u8 *SLJIT2_FUNC sljit2_stack_resize(struct sljit2_stack *stack, sljit2_u8 *new_start);
 
-#endif /* (defined SLJIT_UTIL_STACK && SLJIT_UTIL_STACK) */
+#endif /* (defined SLJIT2_UTIL_STACK && SLJIT2_UTIL_STACK) */
 
-#if !(defined SLJIT_INDIRECT_CALL && SLJIT_INDIRECT_CALL)
+#if !(defined SLJIT2_INDIRECT_CALL && SLJIT2_INDIRECT_CALL)
 
 /* Get the entry address of a given function (signed, unsigned result). */
-#define SLJIT_FUNC_ADDR(func_name)	((sljit_sw)func_name)
-#define SLJIT_FUNC_UADDR(func_name)	((sljit_uw)func_name)
+#define SLJIT2_FUNC_ADDR(func_name)	((sljit2_sw)func_name)
+#define SLJIT2_FUNC_UADDR(func_name)	((sljit2_uw)func_name)
 
-#else /* !(defined SLJIT_INDIRECT_CALL && SLJIT_INDIRECT_CALL) */
+#else /* !(defined SLJIT2_INDIRECT_CALL && SLJIT2_INDIRECT_CALL) */
 
 /* All JIT related code should be placed in the same context (library, binary, etc.). */
 
 /* Get the entry address of a given function (signed, unsigned result). */
-#define SLJIT_FUNC_ADDR(func_name)	(*(sljit_sw*)(void*)func_name)
-#define SLJIT_FUNC_UADDR(func_name)	(*(sljit_uw*)(void*)func_name)
+#define SLJIT2_FUNC_ADDR(func_name)	(*(sljit2_sw*)(void*)func_name)
+#define SLJIT2_FUNC_UADDR(func_name)	(*(sljit2_uw*)(void*)func_name)
 
 /* For powerpc64, the function pointers point to a context descriptor. */
-struct sljit_function_context {
-	sljit_uw addr;
-	sljit_uw r2;
-	sljit_uw r11;
+struct sljit2_function_context {
+	sljit2_uw addr;
+	sljit2_uw r2;
+	sljit2_uw r11;
 };
 
 /* Fill the context arguments using the addr and the function.
    If func_ptr is NULL, it will not be set to the address of context
    If addr is NULL, the function address also comes from the func pointer. */
-SLJIT_API_FUNC_ATTRIBUTE void sljit_set_function_context(void** func_ptr, struct sljit_function_context* context, sljit_uw addr, void* func);
+SLJIT2_API_FUNC_ATTRIBUTE void sljit2_set_function_context(void** func_ptr, struct sljit2_function_context* context, sljit2_uw addr, void* func);
 
-#endif /* !(defined SLJIT_INDIRECT_CALL && SLJIT_INDIRECT_CALL) */
+#endif /* !(defined SLJIT2_INDIRECT_CALL && SLJIT2_INDIRECT_CALL) */
 
-#if (defined SLJIT_EXECUTABLE_ALLOCATOR && SLJIT_EXECUTABLE_ALLOCATOR)
+#if (defined SLJIT2_EXECUTABLE_ALLOCATOR && SLJIT2_EXECUTABLE_ALLOCATOR)
 /* Free unused executable memory. The allocator keeps some free memory
    around to reduce the number of OS executable memory allocations.
    This improves performance since these calls are costly. However
    it is sometimes desired to free all unused memory regions, e.g.
    before the application terminates. */
-SLJIT_API_FUNC_ATTRIBUTE void sljit_free_unused_memory_exec(void);
+SLJIT2_API_FUNC_ATTRIBUTE void sljit2_free_unused_memory_exec(void);
 #endif
 
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
 
-#endif /* SLJIT_LIR_H_ */
+#endif /* SLJIT2_LIR_H_ */
